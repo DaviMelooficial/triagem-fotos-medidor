@@ -43,7 +43,7 @@ privacidade:
     achados=$(git ls-files -z | xargs -0 grep -inE "$termos" | grep -viE '@c[e]sar\.school')
     historico=$(git log --all -p --format=%B | grep -inE "$termos" | grep -viE '@c[e]sar\.school')
     # Fotos fora de exemplos/, hoje ou em qualquer commit antigo.
-    fotos=$(git log --all --name-only --format= | sort -u | grep -iE '\.(jpe?g|png)$' | grep -v -e '^exemplos/' -e '^evidencias/swagger.png$')
+    fotos=$(git log --all --name-only --format= | sort -u | grep -iE '\.(jpe?g|png)$' | grep -v -e '^exemplos/' -e '^evidencias/swagger\.png$')
     if [ -n "$achados" ] || [ -n "$historico" ] || [ -n "$fotos" ]; then
         echo "FALHOU: conteúdo proibido no repositório ou no histórico:"
         echo "$achados"
@@ -51,4 +51,4 @@ privacidade:
         echo "$fotos"
         exit 1
     fi
-    echo "OK: nenhum termo proibido nem foto fora de exemplos/, nos arquivos e no histórico"
+    echo "OK: nenhum termo proibido nem foto fora de exemplos/ (exceto o print do Swagger), nos arquivos e no histórico"
