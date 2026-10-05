@@ -1,4 +1,5 @@
-"""Mede o acerto do extrator num lote real (que NÃO vai para o repositório).
+"""Mede o acerto do extrator num lote de fotos com gabarito (o lote de campo, que NÃO vai para o repositório,
+ou as fotos da equipe em exemplos/). Campo com "NA" no gabarito fica fora da conta.
 
 Uso: uv run python avaliar.py --pasta <pasta das fotos> --csv <csv do lote> --n 50 --modelo qwen2.5vl:3b
 Só imprime números agregados; o detalhe por foto fica em resultados_locais/ (ignorado pelo git).
@@ -18,12 +19,16 @@ def normalizar_numero(texto: str | None) -> str:
     return (texto or "").replace(" ", "").upper().lstrip("0")
 
 
-def acertou_numero(previsto: str | None, esperado: str) -> bool:
+def acertou_numero(previsto: str | None, esperado: str) -> bool | None:
+    if esperado == "NA":
+        return None  # sem gabarito para este campo: não entra na conta
     # Algumas linhas trazem dois medidores ("A/B"); vale acertar qualquer um deles.
     return normalizar_numero(previsto) in {normalizar_numero(n) for n in esperado.split("/")}
 
 
-def acertou_leitura(previsto: str | None, esperado: str) -> bool:
+def acertou_leitura(previsto: str | None, esperado: str) -> bool | None:
+    if esperado == "NA":
+        return None  # sem gabarito para este campo: não entra na conta
     # Compara como inteiro: "012345" e "12345" são a mesma leitura.
     return bool(previsto) and previsto.isdigit() and int(previsto) == int(esperado)
 
@@ -67,22 +72,27 @@ def main():
         escritor.writeheader()
         escritor.writerows(resultados)
 
-    def pct(campo):
-        return 100 * mean(r[campo] for r in resultados)
+    def pct(valores):
+        # Ignora os None (campo sem gabarito) e mostra a % e a contagem, ex. "25% (10/40)".
+        valores = [v for v in valores if v is not None]
+        if not valores:
+            return "sem gabarito"
+        return f"{100 * mean(valores):.0f}% ({sum(valores)}/{len(valores)})"
 
-    # "Acertou tudo" = número e leitura certos; é o que importa para dispensar a revisão.
-    tudo = [r["acerto_numero"] and r["acerto_leitura"] for r in resultados]
-    conf_acerto = [r["confianca"] for r, ok in zip(resultados, tudo) if ok]
-    conf_erro = [r["confianca"] for r, ok in zip(resultados, tudo) if not ok]
+    # "Acertou tudo" = número e leitura certos; só conta fotos com gabarito dos dois campos.
+    com_gabarito = [r for r in resultados if r["acerto_numero"] is not None and r["acerto_leitura"] is not None]
+    tudo = [r["acerto_numero"] and r["acerto_leitura"] for r in com_gabarito]
+    conf_acerto = [r["confianca"] for r, ok in zip(com_gabarito, tudo) if ok]
+    conf_erro = [r["confianca"] for r, ok in zip(com_gabarito, tudo) if not ok]
     print(f"\nModelo: {args.modelo} | fotos avaliadas: {len(resultados)}")
-    print(f"Acerto do número do medidor: {pct('acerto_numero'):.0f}%")
-    print(f"Acerto da leitura:           {pct('acerto_leitura'):.0f}%")
-    print(f"Acerto dos dois campos:      {100 * mean(tudo):.0f}%")
-    print(f"Marcadas para revisão:       {pct('precisa_revisao'):.0f}%")
+    print(f"Acerto do número do medidor: {pct(r['acerto_numero'] for r in resultados)}")
+    print(f"Acerto da leitura:           {pct(r['acerto_leitura'] for r in resultados)}")
+    print(f"Acerto dos dois campos:      {pct(tudo)}")
+    print(f"Marcadas para revisão:       {pct(r['precisa_revisao'] for r in resultados)}")
     print(f"Confiança média quando acerta: {mean(conf_acerto) if conf_acerto else float('nan'):.2f}")
     print(f"Confiança média quando erra:   {mean(conf_erro) if conf_erro else float('nan'):.2f}")
     # Pergunta de negócio: das fotos que o sistema liberaria sem revisão, quantas estavam certas?
-    liberadas = [ok for r, ok in zip(resultados, tudo) if not r["precisa_revisao"]]
+    liberadas = [ok for r, ok in zip(com_gabarito, tudo) if not r["precisa_revisao"]]
     if liberadas:
         print(f"Liberadas sem revisão: {len(liberadas)}, com acerto total em {100 * mean(liberadas):.0f}%")
     print(f"Tempo médio por foto: {mean(r['tempo_segundos'] for r in resultados):.1f} s")
