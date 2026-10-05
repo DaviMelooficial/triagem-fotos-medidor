@@ -238,8 +238,8 @@ Máquina: Mac Apple Silicon (M5, 24 GB), Ollama 0.32.7, N = 3 respostas por foto
 
 Antes de ajustar o prompt para separar a função da leitura no display digital, o acerto nos dois campos na mesma
 amostra era 4/40 (qwen3-vl) e 2/40 (qwen2.5-vl). Depois do ajuste: qwen3-vl continuou em 4/40 e qwen2.5-vl foi para
-1/40. Essa diferença de uma foto está dentro do ruído de uma amostra de 40. O ajuste corrigiu o erro nos exemplos
-de teste e numa foto de campo conferida à mão, mas a maior parte dos erros de campo tem outra causa (abaixo).
+1/40. Essa diferença de uma foto está dentro do ruído de uma amostra de 40. O ajuste corrigiu esse erro numa foto de campo conferida à mão
+(e hoje o teste da foto 01 confere a separação função `103` / leitura `09888`), mas a maior parte dos erros de campo tem outra causa (abaixo).
 
 Leitura honesta: **com modelos de 3–4 bilhões de parâmetros e fotos de 360×480, o sistema não substitui o leiturista**.
 Ele funciona como triagem conservadora: quase tudo vai para revisão, e a confiança média é maior quando acerta do que
@@ -258,13 +258,13 @@ As 4 fotos de `exemplos/` foram tiradas pela equipe dos próprios medidores. Gab
 | `04_tampa_suja.jpg` | tampa suja, display ilegível | número `3202114430` (certo); leitura `006`, divergente nas 3 respostas | 0.33 | **sim** |
 
 `just avaliar exemplos exemplos/controle_equipe.csv 4` resume: número 3/3, leitura 2/2, os dois campos 2/2,
-revisão 2/4, ~3,6 s por foto. As duas legíveis saem unânimes e corretas; as duas ruins vão para revisão.
+revisão 2/4, de ~4 a ~9 s por foto conforme a carga da máquina. As duas legíveis saem unânimes e corretas; as duas ruins vão para revisão.
 
 Por que as fotos da equipe são lidas tão melhor que as de campo? Uma explicação provável é a **resolução**: elas
 têm 900×1600 e 1200×1600, contra 360×480 das fotos de campo avaliadas (cerca de 8 a 11 vezes mais pixels), e foram
 tiradas de perto e com calma. Com só 4 fotos isso é uma indicação, não uma medida.
 
-Tempo do `/extrair` medido com `curl` nas 4 fotos de `exemplos/` (modelo já carregado): de 3,4 s a 4,2 s, média ~3,9 s.
+Tempo do `/extrair` medido com `curl` nas 4 fotos de `exemplos/` (modelo já carregado): de ~3,4 s a ~9,3 s por foto em execuções diferentes (o tempo varia com a carga da máquina).
 
 ## Limitações e propostas de melhoria
 
