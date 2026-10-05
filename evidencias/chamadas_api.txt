@@ -1,0 +1,137 @@
+# Evidência: chamadas reais ao serviço (2026-10-05 15:06, Mac Apple Silicon, Ollama 0.32.7, modelo qwen3-vl:4b)
+
+$ curl -X POST http://localhost:3005/extrair -F "foto=@exemplos/01_display_registro_103.jpg"
+{
+    "numero_medidor": "3223400069",
+    "funcao": "103",
+    "leitura": "09888",
+    "confianca": {
+        "numero_medidor": 1.0,
+        "funcao": 1.0,
+        "leitura": 1.0,
+        "geral": 1.0
+    },
+    "precisa_revisao": false,
+    "modelo": "qwen3-vl:4b",
+    "respostas_brutas": [
+        {
+            "numero_medidor": "3223400069",
+            "funcao": "103",
+            "leitura": "09888"
+        },
+        {
+            "numero_medidor": "3223400069",
+            "funcao": "103",
+            "leitura": "09888"
+        },
+        {
+            "numero_medidor": "3223400069",
+            "funcao": "103",
+            "leitura": "09888"
+        }
+    ],
+    "tempo_segundos": 3.8
+}
+
+$ curl -X POST http://localhost:3005/extrair -F "foto=@exemplos/02_display_registro_03.jpg"
+{
+    "numero_medidor": "3223400069",
+    "funcao": "03",
+    "leitura": "17106",
+    "confianca": {
+        "numero_medidor": 1.0,
+        "funcao": 1.0,
+        "leitura": 1.0,
+        "geral": 1.0
+    },
+    "precisa_revisao": false,
+    "modelo": "qwen3-vl:4b",
+    "respostas_brutas": [
+        {
+            "numero_medidor": "3223400069",
+            "funcao": "03",
+            "leitura": "17106"
+        },
+        {
+            "numero_medidor": "3223400069",
+            "funcao": "03",
+            "leitura": "17106"
+        },
+        {
+            "numero_medidor": "3223400069",
+            "funcao": "03",
+            "leitura": "17106"
+        }
+    ],
+    "tempo_segundos": 7.76
+}
+
+$ curl -X POST http://localhost:3005/extrair -F "foto=@exemplos/03_tampa_opaca.jpg"
+{
+    "numero_medidor": null,
+    "funcao": "kWh",
+    "leitura": "000799",
+    "confianca": {
+        "numero_medidor": 0.67,
+        "funcao": 0.67,
+        "leitura": 0.33,
+        "geral": 0.33
+    },
+    "precisa_revisao": true,
+    "modelo": "qwen3-vl:4b",
+    "respostas_brutas": [
+        {
+            "numero_medidor": "016245308",
+            "funcao": "kWh",
+            "leitura": "000799"
+        },
+        {
+            "numero_medidor": null,
+            "funcao": "kWh",
+            "leitura": "0123456789"
+        },
+        {
+            "numero_medidor": null,
+            "funcao": null,
+            "leitura": null
+        }
+    ],
+    "tempo_segundos": 10.4
+}
+
+$ curl -X POST http://localhost:3005/extrair -F "foto=@exemplos/04_tampa_suja.jpg"
+{
+    "numero_medidor": "3202114430",
+    "funcao": "kWh",
+    "leitura": "006",
+    "confianca": {
+        "numero_medidor": 0.67,
+        "funcao": 0.67,
+        "leitura": 0.33,
+        "geral": 0.33
+    },
+    "precisa_revisao": true,
+    "modelo": "qwen3-vl:4b",
+    "respostas_brutas": [
+        {
+            "numero_medidor": "3202114430",
+            "funcao": "5",
+            "leitura": "006"
+        },
+        {
+            "numero_medidor": "320211443G",
+            "funcao": "kWh",
+            "leitura": "320211443"
+        },
+        {
+            "numero_medidor": "3202114430",
+            "funcao": "kWh",
+            "leitura": "32021"
+        }
+    ],
+    "tempo_segundos": 14.68
+}
+
+$ curl -i -X POST http://localhost:3005/extrair -F "foto=@leitura.txt"
+HTTP/1.1 400 Bad Request
+[{"error":"O arquivo enviado não é uma imagem válida. Envie uma foto JPEG ou PNG."}]

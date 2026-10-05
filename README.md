@@ -80,6 +80,8 @@ uv sync
 ollama pull qwen3-vl:4b
 ```
 
+Ou tudo de uma vez (instala, baixa o modelo e sobe o serviço): `just tudo`.
+
 ### 3. Subir o serviço
 
 ```bash
@@ -168,6 +170,16 @@ HTTP/1.1 400 Bad Request
 
 O 400 vem de `service.py`: o Pillow tenta ler o arquivo; se falhar, levantamos `bentoml.exceptions.InvalidArgument`,
 que o BentoML traduz para "erro de quem enviou" (400), e não "erro do servidor" (500).
+
+## Evidência de execução
+
+A pasta [`evidencias/`](evidencias/) guarda saídas reais do serviço rodando (Mac Apple Silicon, Ollama 0.32.7, `qwen3-vl:4b`):
+
+| arquivo | o que mostra |
+|---|---|
+| [`chamadas_api.txt`](evidencias/chamadas_api.txt) | `curl` nas 4 fotos de `exemplos/` com a resposta completa, e o caso de erro (HTTP 400) |
+| [`testes.txt`](evidencias/testes.txt) | `pytest -v` com os 9 testes passando |
+| [`swagger.png`](evidencias/swagger.png) | a página do Swagger gerada pelo BentoML, com o endpoint `POST /extrair` |
 
 ## Swagger
 
@@ -372,6 +384,11 @@ avaliação, rodar a avaliação com os dois modelos e escrever este README.
   - No display digital o modelo juntava a função à leitura (`03052817`) **com confiança 1.0**. Ajustamos o prompt
     e isso nos mostrou que unanimidade não é acerto.
   - A porta 3000 estava ocupada na máquina de desenvolvimento; a receita `serve` ganhou um parâmetro de porta.
+  - **Erro mais sério:** ao olhar os dados de campo para entender o formato, a IA copiou valores reais (uma leitura
+    num comentário e números de série no prompt). A busca automática por nomes não pegou; pegamos numa revisão
+    que cruzou todos os números do repositório com a base real. Como nada tinha sido publicado, trocamos os valores
+    e reescrevemos o histórico do git antes do primeiro push. Lição: todo exemplo numérico em repositório público
+    precisa ser inventado, e a checagem de privacidade precisa olhar números, não só palavras.
 - **Decisão da equipe:** na primeira versão a IA desenhou imagens de exemplo com Pillow (medidores de mentira). A equipe
   trocou por fotos próprias dos medidores, que mostram o problema real (inclusive tampa opaca e suja) e permitem
   testar com gabarito conhecido; os testes e o `avaliar.py` foram ajustados para isso.

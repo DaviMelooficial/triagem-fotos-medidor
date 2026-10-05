@@ -14,6 +14,10 @@ setup:
 modelo:
     ollama pull {{modelo_padrao}}
 
+# Faz tudo de uma vez: instala dependências, baixa o modelo e sobe a API
+tudo porta="3000": setup modelo
+    uv run bentoml serve service:TriagemMedidor --port {{porta}}
+
 # Sobe a API em http://localhost:3000 (Swagger na mesma página); porta ocupada? "just serve 3001"
 serve porta="3000":
     uv run bentoml serve service:TriagemMedidor --port {{porta}}

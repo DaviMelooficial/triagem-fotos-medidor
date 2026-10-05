@@ -12,3 +12,6 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .DS_Store
+
+# Pacotes compartilhados em privado (ex.: guias.zip)
+*.zip

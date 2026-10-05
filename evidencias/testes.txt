@@ -1,0 +1,12 @@
+# Evidência: testes automatizados (2026-10-05 15:07)
+$ uv run pytest -v
+tests/test_api.py::test_display_registro_103 PASSED                      [ 11%]
+tests/test_api.py::test_display_registro_03 PASSED                       [ 22%]
+tests/test_api.py::test_tampa_opaca_vai_para_revisao PASSED              [ 33%]
+tests/test_api.py::test_tampa_suja_vai_para_revisao PASSED               [ 44%]
+tests/test_api.py::test_arquivo_que_nao_e_imagem_devolve_400 PASSED      [ 55%]
+tests/test_api.py::test_imagem_webp_devolve_400 PASSED                   [ 66%]
+tests/test_votacao.py::test_tres_respostas_iguais_dao_confianca_1 PASSED [ 77%]
+tests/test_votacao.py::test_dois_contra_um_ganha_a_maioria_com_067 PASSED [ 88%]
+tests/test_votacao.py::test_tudo_diferente_da_033 PASSED                 [100%]
+============================== 9 passed in 48.15s ==============================
