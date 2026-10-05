@@ -9,7 +9,7 @@ import ollama
 from pydantic import BaseModel
 
 # Configuração por variável de ambiente: troca o modelo ou o N sem mexer no código.
-MODELO = os.environ.get("OLLAMA_MODELO") or "qwen2.5vl:3b"
+MODELO = os.environ.get("OLLAMA_MODELO") or "qwen3-vl:4b"  # escolhido pela avaliação (README)
 N_RESPOSTAS = int(os.environ.get("N_RESPOSTAS") or 3)
 # O prompt fica num arquivo de texto para poder ser ajustado sem editar Python.
 PROMPT = (Path(__file__).parent / "prompt.txt").read_text(encoding="utf-8")
@@ -36,8 +36,12 @@ def perguntar(imagem: bytes, seed: int, modelo: str) -> dict:
     # No Ollama 0.32 o Qwen3-VL com think=False devolve o JSON no campo "thinking", não no "content".
     texto = resposta.message.content or resposta.message.thinking
     leitura = Leitura.model_validate_json(texto).model_dump()
-    # Texto vazio ou só espaços conta como "não visível" (null), senão vira um voto à parte.
-    return {campo: (valor or "").strip() or None for campo, valor in leitura.items()}
+    limpo = {}
+    for campo, valor in leitura.items():
+        valor = (valor or "").strip()
+        # Vazio ou "null" escrito como texto (o modelo às vezes faz isso) contam como "não visível".
+        limpo[campo] = None if valor.lower() in ("", "null", "none") else valor
+    return limpo
 
 
 def votar(respostas: list[dict]) -> tuple[dict, dict]:
