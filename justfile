@@ -15,8 +15,7 @@ modelo:
     ollama pull {{modelo_padrao}}
 
 # Faz tudo de uma vez: instala dependências, baixa o modelo e sobe a API
-tudo porta="3000": setup modelo
-    uv run bentoml serve service:TriagemMedidor --port {{porta}}
+tudo porta="3000": setup modelo (serve porta)
 
 # Sobe a API em http://localhost:3000 (Swagger na mesma página); porta ocupada? "just serve 3001"
 serve porta="3000":
@@ -44,7 +43,7 @@ privacidade:
     achados=$(git ls-files -z | xargs -0 grep -inE "$termos" | grep -viE '@c[e]sar\.school')
     historico=$(git log --all -p --format=%B | grep -inE "$termos" | grep -viE '@c[e]sar\.school')
     # Fotos fora de exemplos/, hoje ou em qualquer commit antigo.
-    fotos=$(git log --all --name-only --format= | sort -u | grep -iE '\.(jpe?g|png)$' | grep -v '^exemplos/')
+    fotos=$(git log --all --name-only --format= | sort -u | grep -iE '\.(jpe?g|png)$' | grep -v -e '^exemplos/' -e '^evidencias/swagger.png$')
     if [ -n "$achados" ] || [ -n "$historico" ] || [ -n "$fotos" ]; then
         echo "FALHOU: conteúdo proibido no repositório ou no histórico:"
         echo "$achados"

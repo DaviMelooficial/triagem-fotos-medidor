@@ -333,7 +333,7 @@ uv run pytest -v
 | `test_imagem_webp_devolve_400` | imagem WebP (formato não aceito): HTTP 400 |
 | `tests/test_votacao.py` (3 testes) | a conta da confiança (1.0, 0.67, 0.33), sem chamar o modelo |
 
-Saída esperada: `9 passed` em ~20–40 s. Os testes de API usam seed fixa, mas o resultado de um modelo pode variar
+Saída esperada: `9 passed` em ~20–50 s (varia com a carga da máquina). Os testes de API usam seed fixa, mas o resultado de um modelo pode variar
 de uma máquina para outra (CPU vs GPU); se um teste de leitura falhar em outra máquina, rode `just demo` com a mesma
 foto e compare a resposta.
 
@@ -359,7 +359,8 @@ Campo com `NA` no gabarito fica fora da conta daquele campo. Ele imprime só agr
   campo da avaliação ficaram só na máquina de quem rodou o script; aqui estão apenas os números agregados.
 - O `.gitignore` foi o **primeiro commit**, antes de qualquer código, e bloqueia `dados/`, `resultados_locais/`, `.env` etc.
 - `just privacidade` procura termos que identificariam a origem dos dados nos arquivos versionados, no conteúdo de
-  todos os commits e nas mensagens de commit, e procura fotos fora de `exemplos/` em qualquer commit; falha se encontrar.
+  todos os commits e nas mensagens de commit, e procura fotos fora de `exemplos/` em qualquer commit (a única imagem liberada fora dela é o print do Swagger em
+  `evidencias/swagger.png`); falha se encontrar.
 - O modelo roda localmente no Ollama: a foto enviada ao serviço não sai da máquina.
 
 ## Uso de IA
