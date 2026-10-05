@@ -180,8 +180,10 @@ Usamos o **Qwen3-VL 4B** (`qwen3-vl:4b`), um modelo de visão e linguagem **pré
 publicado com pesos abertos sob licença **Apache 2.0**, e servido localmente pelo **Ollama** (quantização Q4_K_M, ~3,3 GB).
 Não fizemos treino nem ajuste fino: o modelo é usado como está, guiado pelo prompt em `prompt.txt`.
 
-Comparamos com o **Qwen2.5-VL 3B** (`qwen2.5vl:3b`, da mesma equipe). O Ollama lista Apache 2.0 para ele, mas o card
-oficial do 3B no Hugging Face usa a "Qwen Research License"; para uso comercial vale conferir. O Qwen3-VL 4B ganhou nas
+Comparamos com o **Qwen2.5-VL 3B** (`qwen2.5vl:3b`, da mesma equipe). Atenção à licença: no Hugging Face o
+Qwen2.5-VL-3B-Instruct é publicado sob a **Qwen Research License** (`license_name: qwen-research`), que não permite uso
+comercial sem licença da Alibaba (a página do Ollama mostra Apache 2.0, mas vale o card oficial). Já o
+Qwen3-VL-4B-Instruct é **Apache 2.0** no Hugging Face. O Qwen3-VL 4B ganhou nas
 duas coisas que importam aqui, acerto e tempo (tabela abaixo), então virou o padrão.
 
 Motivos da escolha de um modelo pequeno e local: roda em notebook comum, não manda foto de cliente para nenhuma API
@@ -208,6 +210,9 @@ A **confiança geral** é a menor das três (a foto é tão confiável quanto o 
 Exemplo: respostas de leitura `052817`, `052817`, `052819` → leitura `052817`, confiança 0.67, vai para revisão.
 Os testes em `tests/test_votacao.py` mostram essas contas sem precisar do modelo.
 
+Empate: se as 3 respostas forem diferentes, vence a primeira (a da seed 1), com confiança 0.33, e a foto vai para
+revisão de qualquer jeito. Por isso use **N ímpar** (3, 5...): com N par, um 2 a 2 seria decidido pela ordem, não por voto.
+
 Ponto importante: **unanimidade não é garantia de acerto** (ver Resultados). A confiança separa as fotos
 em "certamente duvidosa" e "talvez boa", não em "certamente certa".
 
@@ -220,18 +225,19 @@ Máquina: Mac Apple Silicon (M5, 24 GB), Ollama 0.32.7, N = 3 respostas por foto
 
 | métrica | `qwen3-vl:4b` (padrão) | `qwen2.5vl:3b` |
 |---|---|---|
-| acerto do número do medidor | 25% | 18% |
-| acerto da leitura | 10% | 10% |
-| acerto dos dois campos | **10%** | 2% |
-| fotos marcadas para revisão | 95% | 100% |
+| acerto do número do medidor | 25% (10/40) | 17,5% (7/40) |
+| acerto da leitura | 10% (4/40) | 10% (4/40) |
+| acerto dos dois campos | **10% (4/40)** | 2,5% (1/40) |
+| fotos marcadas para revisão | 95% (38/40) | 100% (40/40) |
 | confiança média quando acerta os dois | 0.59 | 0.67 |
 | confiança média quando erra | 0.47 | 0.36 |
 | fotos liberadas sem revisão | 2 (ambas erradas) | 0 |
 | tempo médio por foto (3 chamadas) | **7,8 s** | 11,9 s |
 
-Antes de ajustar o prompt para separar a função da leitura no display digital, os números na mesma amostra eram
-10% (qwen3-vl) e 5% (qwen2.5-vl) de acerto nos dois campos: o ajuste corrigiu esse erro nas fotos sintéticas e numa
-foto real conferida à mão, mas não mudou o agregado da amostra, porque a maior parte dos erros tem outra causa (abaixo).
+Antes de ajustar o prompt para separar a função da leitura no display digital, o acerto nos dois campos na mesma
+amostra era 4/40 (qwen3-vl) e 2/40 (qwen2.5-vl). Depois do ajuste: qwen3-vl continuou em 4/40 e qwen2.5-vl foi para
+1/40. Essa diferença de uma foto está dentro do ruído de uma amostra de 40. O ajuste corrigiu o erro nas fotos
+sintéticas e numa foto real conferida à mão, mas a maior parte dos erros reais tem outra causa (abaixo).
 
 Leitura honesta: **com modelos de 3–4 bilhões de parâmetros e fotos de 360×480, o sistema não substitui o leiturista**.
 Ele funciona como triagem conservadora: quase tudo vai para revisão, e a confiança média é maior quando acerta do que
@@ -258,6 +264,10 @@ Padrões de erro que observamos nas fotos reais:
    ou um número que não aparece na foto; parte do "erro" é do gabarito, não do modelo.
 
 Testamos ampliar a foto 2× antes de enviar ao modelo: não mudou o acerto em 15 fotos, então descartamos.
+
+Limitação do serviço: se o modelo devolver um JSON inválido (fora do schema), a API responde **500**, sem tentar de novo.
+
+Formatos aceitos: só JPEG e PNG. Outra imagem (WebP, TIFF...) recebe 400 com "Formato ... não aceito".
 
 Propostas, da mais barata para a mais cara:
 
@@ -286,9 +296,10 @@ uv run pytest -v
 | `test_medidor_de_rolete_le_o_registro_kwh` | medidor de rolete: lê o registro kWh e preserva o zero à esquerda do número |
 | `test_foto_sem_medidor_vai_para_revisao` | caixa fechada: leitura `null` e `precisa_revisao = true` |
 | `test_arquivo_que_nao_e_imagem_devolve_400` | arquivo texto: HTTP 400 com mensagem clara |
+| `test_imagem_webp_devolve_400` | imagem WebP (formato não aceito): HTTP 400 |
 | `tests/test_votacao.py` (3 testes) | a conta da confiança (1.0, 0.67, 0.33), sem chamar o modelo |
 
-Saída esperada: `7 passed` em ~40 s. Os testes de API usam seed fixa, mas o resultado de um modelo pode variar
+Saída esperada: `8 passed` em ~40 s. Os testes de API usam seed fixa, mas o resultado de um modelo pode variar
 de uma máquina para outra (CPU vs GPU); se um teste de leitura falhar em outra máquina, rode `just demo` com a mesma
 foto e compare a resposta.
 
@@ -310,8 +321,8 @@ Ele imprime só agregados; o detalhe por foto vai para `resultados_locais/`, que
 - Nenhuma foto real nem linha real do controle de campo está neste repositório. As fotos reais ficaram só na máquina
   de quem rodou a avaliação; aqui estão apenas os números agregados.
 - O `.gitignore` foi o **primeiro commit**, antes de qualquer código, e bloqueia `dados/`, `resultados_locais/`, `.env` etc.
-- `just privacidade` procura, em todos os arquivos versionados, termos que identificariam a origem dos dados e fotos
-  fora de `exemplos/`; falha se encontrar.
+- `just privacidade` procura termos que identificariam a origem dos dados nos arquivos versionados, no conteúdo de
+  todos os commits e nas mensagens de commit, e procura fotos fora de `exemplos/` em qualquer commit; falha se encontrar.
 - O modelo roda localmente no Ollama: a foto enviada ao serviço não sai da máquina.
 
 ## Uso de IA
