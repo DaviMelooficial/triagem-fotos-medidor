@@ -65,7 +65,8 @@ def main():
         print(f"{i}/{len(amostra)} processadas", end="\r")
 
     # Salva ao lado do script (pasta ignorada pelo git), de onde quer que ele seja chamado.
-    saida = Path(__file__).parent / "resultados_locais" / f"avaliacao_{args.modelo.replace(':', '_')}.csv"
+    # O nome leva a pasta avaliada e o modelo, para uma avaliação não sobrescrever a outra.
+    saida = Path(__file__).parent / "resultados_locais" / f"avaliacao_{args.pasta.resolve().name}_{args.modelo.replace(':', '_')}.csv"
     saida.parent.mkdir(exist_ok=True)
     with open(saida, "w", encoding="utf-8", newline="") as arquivo:
         escritor = csv.DictWriter(arquivo, fieldnames=resultados[0].keys(), delimiter=";")
@@ -89,8 +90,9 @@ def main():
     print(f"Acerto da leitura:           {pct(r['acerto_leitura'] for r in resultados)}")
     print(f"Acerto dos dois campos:      {pct(tudo)}")
     print(f"Marcadas para revisão:       {pct(r['precisa_revisao'] for r in resultados)}")
-    print(f"Confiança média quando acerta: {mean(conf_acerto) if conf_acerto else float('nan'):.2f}")
-    print(f"Confiança média quando erra:   {mean(conf_erro) if conf_erro else float('nan'):.2f}")
+    # Sem nenhum caso (ex.: nenhum erro), imprime "sem casos" em vez de uma média vazia.
+    print(f"Confiança média quando acerta: {f'{mean(conf_acerto):.2f}' if conf_acerto else 'sem casos'}")
+    print(f"Confiança média quando erra:   {f'{mean(conf_erro):.2f}' if conf_erro else 'sem casos'}")
     # Pergunta de negócio: das fotos que o sistema liberaria sem revisão, quantas estavam certas?
     liberadas = [ok for r, ok in zip(com_gabarito, tudo) if not r["precisa_revisao"]]
     if liberadas:
