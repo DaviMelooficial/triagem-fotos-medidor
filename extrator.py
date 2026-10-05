@@ -11,6 +11,8 @@ from pydantic import BaseModel
 # Configuração por variável de ambiente: troca o modelo ou o N sem mexer no código.
 MODELO = os.environ.get("OLLAMA_MODELO") or "qwen3-vl:4b"  # escolhido pela avaliação (README)
 N_RESPOSTAS = int(os.environ.get("N_RESPOSTAS") or 3)
+if N_RESPOSTAS < 1 or N_RESPOSTAS % 2 == 0:  # ímpar evita empate na votação; 0 quebraria a conta
+    raise ValueError(f"N_RESPOSTAS deve ser ímpar e maior que 0 (recebido: {N_RESPOSTAS})")
 # O prompt fica num arquivo de texto para poder ser ajustado sem editar Python.
 PROMPT = (Path(__file__).parent / "prompt.txt").read_text(encoding="utf-8")
 CAMPOS = ["numero_medidor", "funcao", "leitura"]

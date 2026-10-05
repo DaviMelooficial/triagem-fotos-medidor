@@ -211,7 +211,7 @@ Exemplo: respostas de leitura `052817`, `052817`, `052819` → leitura `052817`,
 Os testes em `tests/test_votacao.py` mostram essas contas sem precisar do modelo.
 
 Empate: se as 3 respostas forem diferentes, vence a primeira (a da seed 1), com confiança 0.33, e a foto vai para
-revisão de qualquer jeito. Por isso use **N ímpar** (3, 5...): com N par, um 2 a 2 seria decidido pela ordem, não por voto.
+revisão de qualquer jeito. Por isso **N precisa ser ímpar** (3, 5...): com N par, um 2 a 2 seria decidido pela ordem, não por voto. O serviço se recusa a subir com N par ou zero.
 
 Ponto importante: **unanimidade não é garantia de acerto** (ver Resultados). A confiança separa as fotos
 em "certamente duvidosa" e "talvez boa", não em "certamente certa".
@@ -255,7 +255,7 @@ Padrões de erro que observamos nas fotos reais:
 4. **Alucinação de sequência**: quando não enxerga, o modelo pequeno devolve coisas como `000000`, `012345`, `8888888`
    ou `1023456789`. Com 3 respostas diferentes isso cai na revisão, mas às vezes ele repete o mesmo chute.
 5. **Unanimidade errada**: em 2 fotos o `qwen3-vl:4b` deu a mesma resposta nas 3 vezes (confiança 1.0), a foto foi
-   liberada sem revisão e estava errada: numa, um dígito trocado no número de série; na outra, o número lido não é o
+   liberada sem revisão e estava errada: numa, dois dígitos errados no número de série e a leitura também errada; na outra, o número lido não é o
    do cadastro e a leitura difere da anotada em 1.
 6. **Confundir campos**: pegar o nome do modelo do equipamento impresso na tampa como número de série, ou juntar a
    função à leitura no display (corrigido no prompt).

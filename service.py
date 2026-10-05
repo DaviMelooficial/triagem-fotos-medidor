@@ -31,7 +31,7 @@ class TriagemMedidor:
                 imagem.verify()  # confere a estrutura do arquivo (não detecta toda imagem cortada no meio)
         except Exception:
             # InvalidArgument vira HTTP 400: o erro é de quem enviou, não do servidor.
-            raise InvalidArgument("O arquivo enviado não é uma imagem válida. Envie uma foto JPEG ou PNG.")
+            raise InvalidArgument("O arquivo enviado não é uma imagem válida. Envie uma foto JPEG ou PNG.") from None
         # Fora do try para a mensagem não ser trocada pela de cima. Outros formatos davam erro 500 no Ollama.
         if formato not in ("JPEG", "PNG"):
             raise InvalidArgument(f"Formato {formato} não aceito. Envie uma foto JPEG ou PNG.")
