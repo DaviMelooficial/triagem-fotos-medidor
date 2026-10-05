@@ -41,6 +41,8 @@ def main():
     # Só fotos que existem e que o leiturista conseguiu ler (sem nota de ocorrência).
     validas = [l for l in linhas if l["Nota de Leitura Atual"] == "NA"
                and l["Foto do medidor"] != "NA" and (args.pasta / l["Foto do medidor"]).exists()]
+    if not validas:
+        raise SystemExit("Nenhuma foto para avaliar: confira --pasta e se o CSV tem linhas com nota NA e foto existente.")
     amostra = random.Random(42).sample(validas, min(args.n, len(validas)))  # seed fixa: amostra repetível
 
     resultados = []
@@ -57,7 +59,8 @@ def main():
         })
         print(f"{i}/{len(amostra)} processadas", end="\r")
 
-    saida = Path("resultados_locais") / f"avaliacao_{args.modelo.replace(':', '_')}.csv"
+    # Salva ao lado do script (pasta ignorada pelo git), de onde quer que ele seja chamado.
+    saida = Path(__file__).parent / "resultados_locais" / f"avaliacao_{args.modelo.replace(':', '_')}.csv"
     saida.parent.mkdir(exist_ok=True)
     with open(saida, "w", encoding="utf-8", newline="") as arquivo:
         escritor = csv.DictWriter(arquivo, fieldnames=resultados[0].keys(), delimiter=";")
