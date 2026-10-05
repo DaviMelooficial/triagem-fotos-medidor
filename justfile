@@ -23,12 +23,8 @@ testar:
     uv run pytest -v
 
 # Envia uma foto de exemplo para a API já rodando (abra "just serve" em outro terminal)
-demo foto="exemplos/01_eletronico.jpg" porta="3000":
+demo foto="exemplos/01_display_registro_103.jpg" porta="3000":
     curl -s -X POST http://localhost:{{porta}}/extrair -F "foto=@{{foto}}"
-
-# Redesenha as imagens sintéticas de exemplos/
-exemplos:
-    uv run python gerar_exemplos.py
 
 # Mede o acerto num lote real local (pasta de fotos + CSV), que não vai para o git
 avaliar PASTA CSV N="50":
