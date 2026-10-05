@@ -396,7 +396,7 @@ avaliação, rodar a avaliação com os dois modelos e escrever este README.
 - **O que a IA não resolve:** a acurácia baixa nas fotos reais é limite do modelo pequeno e da qualidade das fotos,
   não do código. Os números da avaliação foram gerados executando o script, não estimados.
 - **Responsabilidade da equipe:** o código foi mantido simples de propósito (poucos arquivos, funções curtas,
-  comentários explicando o porquê) para que a equipe revise e saiba explicar cada linha; a revisão final e a
+  comentários explicando o porquê); a revisão final e a
   responsabilidade pela entrega são da equipe.
 
 ## Licença
