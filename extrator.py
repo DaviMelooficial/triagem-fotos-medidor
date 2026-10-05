@@ -48,6 +48,7 @@ def votar(respostas: list[dict]) -> tuple[dict, dict]:
     """Para cada campo fica o valor mais votado; a confiança é a fração de votos dele."""
     valores, confianca = {}, {}
     for campo in CAMPOS:
+        # Em empate (ex.: 3 respostas diferentes) vence a que apareceu primeiro, a da seed 1.
         valor, votos = Counter(r[campo] for r in respostas).most_common(1)[0]
         valores[campo] = valor
         confianca[campo] = round(votos / len(respostas), 2)

@@ -39,12 +39,17 @@ privacidade:
     #!/usr/bin/env bash
     set -uo pipefail
     # As letras entre colchetes evitam que este próprio arquivo contenha as palavras proibidas.
-    achados=$(git ls-files -z | xargs -0 grep -inE 'n[e]oenergia|c[e]lpe|p[e]rnambuco|c[e]sar|e[l]ster' | grep -viE '@c[e]sar\.school')
-    fotos=$(git ls-files | grep -iE '\.(jpe?g|png)$' | grep -v '^exemplos/')
-    if [ -n "$achados" ] || [ -n "$fotos" ]; then
-        echo "FALHOU: conteúdo proibido em arquivos versionados:"
+    termos='n[e]oenergia|c[e]lpe|p[e]rnambuco|c[e]sar|e[l]ster'
+    # 1) arquivos de hoje; 2) todo o histórico: conteúdo de cada commit e mensagens de commit.
+    achados=$(git ls-files -z | xargs -0 grep -inE "$termos" | grep -viE '@c[e]sar\.school')
+    historico=$(git log --all -p --format=%B | grep -inE "$termos" | grep -viE '@c[e]sar\.school')
+    # Fotos fora de exemplos/, hoje ou em qualquer commit antigo.
+    fotos=$(git log --all --name-only --format= | sort -u | grep -iE '\.(jpe?g|png)$' | grep -v '^exemplos/')
+    if [ -n "$achados" ] || [ -n "$historico" ] || [ -n "$fotos" ]; then
+        echo "FALHOU: conteúdo proibido no repositório ou no histórico:"
         echo "$achados"
+        echo "$historico"
         echo "$fotos"
         exit 1
     fi
-    echo "OK: nenhum termo proibido nem foto fora de exemplos/"
+    echo "OK: nenhum termo proibido nem foto fora de exemplos/, nos arquivos e no histórico"
