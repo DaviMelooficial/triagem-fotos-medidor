@@ -100,7 +100,10 @@ def foto_ruim(img):
     """Simula foto tirada às pressas: um pouco torta, desfocada e com ruído."""
     img = img.rotate(6, resample=Image.BICUBIC, fillcolor=(96, 92, 84))
     img = img.filter(ImageFilter.GaussianBlur(1.2))
-    ruido = Image.effect_noise((LARGURA, ALTURA), 40).convert("RGB")
+    # Ruído com seed fixa: rodar "just exemplos" de novo gera exatamente a mesma imagem.
+    sorteio = random.Random(42)
+    pixels = bytes(min(255, max(0, int(sorteio.gauss(128, 40)))) for _ in range(LARGURA * ALTURA))
+    ruido = Image.frombytes("L", (LARGURA, ALTURA), pixels).convert("RGB")
     return Image.blend(img, ruido, 0.12)
 
 
