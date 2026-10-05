@@ -27,8 +27,12 @@ class TriagemMedidor:
         """Recebe a foto (multipart, campo "foto") e devolve número, função, leitura e confiança."""
         try:
             with Image.open(foto) as imagem:
-                imagem.verify()  # lê o cabeçalho e confere se o arquivo é mesmo uma imagem
+                formato = imagem.format  # "JPEG", "PNG", "WEBP"...
+                imagem.verify()  # confere a estrutura do arquivo (não detecta toda imagem cortada no meio)
         except Exception:
             # InvalidArgument vira HTTP 400: o erro é de quem enviou, não do servidor.
             raise InvalidArgument("O arquivo enviado não é uma imagem válida. Envie uma foto JPEG ou PNG.")
+        # Fora do try para a mensagem não ser trocada pela de cima. Outros formatos davam erro 500 no Ollama.
+        if formato not in ("JPEG", "PNG"):
+            raise InvalidArgument(f"Formato {formato} não aceito. Envie uma foto JPEG ou PNG.")
         return extrator.extrair(foto)

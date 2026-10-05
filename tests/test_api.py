@@ -3,9 +3,11 @@
 Precisam do Ollama aberto e do modelo baixado (veja o README).
 """
 
+import io
 from pathlib import Path
 
 import httpx
+from PIL import Image
 
 EXEMPLOS = Path(__file__).parent.parent / "exemplos"
 TIMEOUT = 300  # o modelo pode levar dezenas de segundos por foto
@@ -49,3 +51,12 @@ def test_arquivo_que_nao_e_imagem_devolve_400(url):
     resposta = enviar(url, "leitura.txt", b"isto nao e uma foto", tipo="text/plain")
     assert resposta.status_code == 400
     assert "não é uma imagem válida" in resposta.text
+
+
+def test_imagem_webp_devolve_400(url):
+    # É uma imagem de verdade, mas num formato que o serviço não aceita.
+    buffer = io.BytesIO()
+    Image.new("RGB", (40, 40), "white").save(buffer, format="WEBP")
+    resposta = enviar(url, "foto.webp", buffer.getvalue(), tipo="image/webp")
+    assert resposta.status_code == 400
+    assert "Formato WEBP não aceito" in resposta.text
