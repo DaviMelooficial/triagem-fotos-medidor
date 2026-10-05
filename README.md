@@ -232,7 +232,9 @@ Máquina: Mac Apple Silicon (M5, 24 GB), Ollama 0.32.7, N = 3 respostas por foto
 | confiança média quando acerta os dois | 0.59 | 0.67 |
 | confiança média quando erra | 0.47 | 0.36 |
 | fotos liberadas sem revisão | 2 (ambas erradas) | 0 |
-| tempo médio por foto (3 chamadas) | **7,8 s** | 11,9 s |
+| tempo médio por foto (3 chamadas) | **7,8 a 15,7 s**¹ | 11,9 s |
+
+¹ A mesma amostra, com as mesmas respostas, levou 7,8 s numa execução e 15,7 s em outra, na mesma máquina: o tempo depende da carga do computador. O `qwen2.5vl:3b` foi medido uma vez só, então a comparação de tempo entre os dois é indicativa; a de acerto, não muda entre execuções.
 
 Antes de ajustar o prompt para separar a função da leitura no display digital, o acerto nos dois campos na mesma
 amostra era 4/40 (qwen3-vl) e 2/40 (qwen2.5-vl). Depois do ajuste: qwen3-vl continuou em 4/40 e qwen2.5-vl foi para
