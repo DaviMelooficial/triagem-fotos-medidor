@@ -1,0 +1,21 @@
+[project]
+name = "triagem-fotos-medidor"
+version = "0.1.0"
+description = "Serviço BentoML que lê a foto de um medidor de energia e devolve número, função e leitura."
+readme = "README.md"
+requires-python = "==3.12.*"
+dependencies = [
+    "bentoml==1.4.39",
+    "ollama==0.6.3",
+    "pillow==11.3.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx==0.28.1",
+    "pytest==8.4.2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]  # deixa os testes importarem extrator.py e service.py da raiz
