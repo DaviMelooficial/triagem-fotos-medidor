@@ -102,28 +102,28 @@ RuntimeError: Modelo qwen3-vl:4b não encontrado. Rode: ollama pull qwen3-vl:4b
 ```bash
 just demo
 # ou, sem just (Mac/Linux):
-curl -X POST http://localhost:3000/extrair -F "foto=@exemplos/01_eletronico.jpg"
+curl -X POST http://localhost:3000/extrair -F "foto=@exemplos/01_display_registro_103.jpg"
 # Windows (PowerShell): use curl.exe para não cair no alias do PowerShell
-curl.exe -X POST http://localhost:3000/extrair -F "foto=@exemplos/01_eletronico.jpg"
+curl.exe -X POST http://localhost:3000/extrair -F "foto=@exemplos/01_display_registro_103.jpg"
 ```
 
-Para testar outra foto: `just demo exemplos/02_rolete.jpg`.
+Para testar outra foto: `just demo exemplos/02_display_registro_03.jpg` (ou `03_tampa_opaca.jpg`, `04_tampa_suja.jpg`).
 
 ## Contrato da API
 
 **`POST /extrair`** — `multipart/form-data` com um campo **`foto`** (arquivo JPEG ou PNG).
 
 ```bash
-curl -X POST http://localhost:3000/extrair -F "foto=@exemplos/01_eletronico.jpg"
+curl -X POST http://localhost:3000/extrair -F "foto=@exemplos/01_display_registro_103.jpg"
 ```
 
 Resposta real (HTTP 200) dessa chamada:
 
 ```json
 {
-    "numero_medidor": "4071835526",
-    "funcao": "03",
-    "leitura": "052817",
+    "numero_medidor": "3223400069",
+    "funcao": "103",
+    "leitura": "09888",
     "confianca": {
         "numero_medidor": 1.0,
         "funcao": 1.0,
@@ -133,11 +133,11 @@ Resposta real (HTTP 200) dessa chamada:
     "precisa_revisao": false,
     "modelo": "qwen3-vl:4b",
     "respostas_brutas": [
-        {"numero_medidor": "4071835526", "funcao": "03", "leitura": "052817"},
-        {"numero_medidor": "4071835526", "funcao": "03", "leitura": "052817"},
-        {"numero_medidor": "4071835526", "funcao": "03", "leitura": "052817"}
+        {"numero_medidor": "3223400069", "funcao": "103", "leitura": "09888"},
+        {"numero_medidor": "3223400069", "funcao": "103", "leitura": "09888"},
+        {"numero_medidor": "3223400069", "funcao": "103", "leitura": "09888"}
     ],
-    "tempo_segundos": 7.4
+    "tempo_segundos": 4.21
 }
 ```
 
@@ -236,14 +236,33 @@ Máquina: Mac Apple Silicon (M5, 24 GB), Ollama 0.32.7, N = 3 respostas por foto
 
 Antes de ajustar o prompt para separar a função da leitura no display digital, o acerto nos dois campos na mesma
 amostra era 4/40 (qwen3-vl) e 2/40 (qwen2.5-vl). Depois do ajuste: qwen3-vl continuou em 4/40 e qwen2.5-vl foi para
-1/40. Essa diferença de uma foto está dentro do ruído de uma amostra de 40. O ajuste corrigiu o erro nas fotos
-sintéticas e numa foto real conferida à mão, mas a maior parte dos erros reais tem outra causa (abaixo).
+1/40. Essa diferença de uma foto está dentro do ruído de uma amostra de 40. O ajuste corrigiu o erro nos exemplos
+de teste e numa foto de campo conferida à mão, mas a maior parte dos erros de campo tem outra causa (abaixo).
 
 Leitura honesta: **com modelos de 3–4 bilhões de parâmetros e fotos de 360×480, o sistema não substitui o leiturista**.
 Ele funciona como triagem conservadora: quase tudo vai para revisão, e a confiança média é maior quando acerta do que
-quando erra (o sinal existe, mas é fraco). Nas fotos sintéticas, que são nítidas, o mesmo modelo acerta tudo.
+quando erra (o sinal existe, mas é fraco).
 
-Tempo do `/extrair` medido com `curl` nas 5 imagens de `exemplos/` (modelo já carregado): de 3,5 s a 14,6 s, média ~9 s.
+### Fotos da equipe (`exemplos/`)
+
+As 4 fotos de `exemplos/` foram tiradas pela equipe dos próprios medidores. Gabarito em `exemplos/controle_equipe.csv`
+(`NA` = campo ilegível na foto, fica fora da conta). Saída real com `qwen3-vl:4b`:
+
+| foto | o que mostra | resposta | confiança geral | revisão? |
+|---|---|---|---|---|
+| `01_display_registro_103.jpg` | display nítido, registro 103 | `3223400069` / `103` / `09888` — correto, 3 de 3 iguais | 1.0 | não |
+| `02_display_registro_03.jpg` | mesmo medidor, registro 03 | `3223400069` / `03` / `17106` — correto, 3 de 3 iguais | 1.0 | não |
+| `03_tampa_opaca.jpg` | tampa opaca, nada legível | leitura `000799`; uma das respostas foi `0123456789` (alucinação) | 0.33 | **sim** |
+| `04_tampa_suja.jpg` | tampa suja, display ilegível | número `3202114430` (certo); leitura `006`, divergente nas 3 respostas | 0.33 | **sim** |
+
+`just avaliar exemplos exemplos/controle_equipe.csv 4` resume: número 3/3, leitura 2/2, os dois campos 2/2,
+revisão 2/4, ~3,6 s por foto. As duas legíveis saem unânimes e corretas; as duas ruins vão para revisão.
+
+Por que as fotos da equipe são lidas tão melhor que as de campo? Uma explicação provável é a **resolução**: elas
+têm 900×1600 e 1200×1600, contra 360×480 das fotos de campo avaliadas (cerca de 8 a 11 vezes mais pixels), e foram
+tiradas de perto e com calma. Com só 4 fotos isso é uma indicação, não uma medida.
+
+Tempo do `/extrair` medido com `curl` nas 4 fotos de `exemplos/` (modelo já carregado): de 3,4 s a 4,2 s, média ~3,9 s.
 
 ## Limitações e propostas de melhoria
 
@@ -292,19 +311,20 @@ uv run pytest -v
 
 | teste | o que confere |
 |---|---|
-| `test_medidor_eletronico_le_numero_funcao_e_leitura` | display LCD: número, função `03`, leitura com zero à esquerda e formato da resposta |
-| `test_medidor_de_rolete_le_o_registro_kwh` | medidor de rolete: lê o registro kWh e preserva o zero à esquerda do número |
-| `test_foto_sem_medidor_vai_para_revisao` | caixa fechada: leitura `null` e `precisa_revisao = true` |
+| `test_display_registro_103` | foto 01: número, função `103`, leitura `09888` (zero à esquerda) e formato da resposta |
+| `test_display_registro_03` | foto 02: número, função `03`, leitura `17106` |
+| `test_tampa_opaca_vai_para_revisao` | foto 03: `precisa_revisao = true` e confiança geral < 1 |
+| `test_tampa_suja_vai_para_revisao` | foto 04: `precisa_revisao = true` e confiança geral < 1 |
 | `test_arquivo_que_nao_e_imagem_devolve_400` | arquivo texto: HTTP 400 com mensagem clara |
 | `test_imagem_webp_devolve_400` | imagem WebP (formato não aceito): HTTP 400 |
 | `tests/test_votacao.py` (3 testes) | a conta da confiança (1.0, 0.67, 0.33), sem chamar o modelo |
 
-Saída esperada: `8 passed` em ~40 s. Os testes de API usam seed fixa, mas o resultado de um modelo pode variar
+Saída esperada: `9 passed` em ~20–40 s. Os testes de API usam seed fixa, mas o resultado de um modelo pode variar
 de uma máquina para outra (CPU vs GPU); se um teste de leitura falhar em outra máquina, rode `just demo` com a mesma
 foto e compare a resposta.
 
-As imagens de `exemplos/` são **sintéticas**, desenhadas por `gerar_exemplos.py` (marcas e números fictícios).
-Para redesenhar: `just exemplos`. O `exemplos/controle_ficticio.csv` segue o mesmo formato do controle real
+As imagens de `exemplos/` são **fotos tiradas pela equipe dos próprios medidores**. O `exemplos/controle_equipe.csv`
+é o gabarito delas, no mesmo formato do controle de campo
 (`Numero do medidor;Posicao do medidor lida;Nota de Leitura Atual;Foto do medidor`, separador `;`, `NA` = sem valor).
 
 Para rodar a avaliação num lote próprio (fotos + CSV nesse formato):
@@ -312,14 +332,17 @@ Para rodar a avaliação num lote próprio (fotos + CSV nesse formato):
 ```bash
 just avaliar /caminho/das/fotos /caminho/do/controle.csv 40
 # ou: uv run python avaliar.py --pasta /caminho/das/fotos --csv /caminho/do/controle.csv --n 40 --modelo qwen3-vl:4b
+# com as fotos da equipe:
+just avaliar exemplos exemplos/controle_equipe.csv 4
 ```
 
-Ele imprime só agregados; o detalhe por foto vai para `resultados_locais/`, que o git ignora.
+Campo com `NA` no gabarito fica fora da conta daquele campo. Ele imprime só agregados; o detalhe por foto vai para `resultados_locais/`, que o git ignora.
 
 ## Privacidade dos dados
 
-- Nenhuma foto real nem linha real do controle de campo está neste repositório. As fotos reais ficaram só na máquina
-  de quem rodou a avaliação; aqui estão apenas os números agregados.
+- As fotos de `exemplos/` são da equipe, tiradas dos próprios medidores, e foram publicadas sem metadados (sem EXIF,
+  sem localização). Nenhuma foto do cliente nem linha do controle de campo está neste repositório: as 40 fotos de
+  campo da avaliação ficaram só na máquina de quem rodou o script; aqui estão apenas os números agregados.
 - O `.gitignore` foi o **primeiro commit**, antes de qualquer código, e bloqueia `dados/`, `resultados_locais/`, `.env` etc.
 - `just privacidade` procura termos que identificariam a origem dos dados nos arquivos versionados, no conteúdo de
   todos os commits e nas mensagens de commit, e procura fotos fora de `exemplos/` em qualquer commit; falha se encontrar.
@@ -330,7 +353,7 @@ Ele imprime só agregados; o detalhe por foto vai para `resultados_locais/`, que
 **Ferramenta:** Claude Code, com o modelo Claude Opus 5.5.
 
 **O que pedimos:** montar o repositório do zero com a arquitetura que definimos (BentoML → Ollama → JSON), código
-simples e comentado em português, o cálculo de confiança por votação, as imagens sintéticas, os testes, o script de
+simples e comentado em português, o cálculo de confiança por votação, imagens de exemplo, os testes, o script de
 avaliação, rodar a avaliação com os dois modelos e escrever este README.
 
 **Avaliação crítica (o que aconteceu de verdade):**
@@ -347,6 +370,9 @@ avaliação, rodar a avaliação com os dois modelos e escrever este README.
   - No display digital o modelo juntava a função à leitura (`03052817`) **com confiança 1.0**. Ajustamos o prompt
     e isso nos mostrou que unanimidade não é acerto.
   - A porta 3000 estava ocupada na máquina de desenvolvimento; a receita `serve` ganhou um parâmetro de porta.
+- **Decisão da equipe:** na primeira versão a IA desenhou imagens de exemplo com Pillow (medidores de mentira). A equipe
+  trocou por fotos próprias dos medidores, que mostram o problema real (inclusive tampa opaca e suja) e permitem
+  testar com gabarito conhecido; os testes e o `avaliar.py` foram ajustados para isso.
 - **O que a IA não resolve:** a acurácia baixa nas fotos reais é limite do modelo pequeno e da qualidade das fotos,
   não do código. Os números da avaliação foram gerados executando o script, não estimados.
 - **Responsabilidade da equipe:** o código foi mantido simples de propósito (poucos arquivos, funções curtas,
