@@ -1,0 +1,14 @@
+# Material de apoio e dados reais: nunca vão para o repositório público
+guias/
+dados/
+resultados_locais/
+
+# Segredos e ambiente local
+.env
+.venv/
+
+# Lixo do Python e do macOS
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
