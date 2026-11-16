@@ -91,7 +91,8 @@ just carga 100
 # Prometheus: http://localhost:9090  (Status > Targets: triagem-medidor UP)
 # Loki pela API: curl -s -G localhost:3100/loki/api/v1/query --data-urlencode 'query=sum by (evento,status) (count_over_time({job="triagem-medidor"}[1h]))'
 # Grafana: http://localhost:3030 (sem login; Explore > Prometheus ou Loki)
-just duckdb                   # 12 coletas do /metrics em 1 min + log -> monitoring/metrics.duckdb
+just duckdb                   # 12 coletas do /metrics em 1 min + log -> monitoring/metrics.duckdb;
+                              # rode junto com "just carga 50" em outro terminal, para a janela ter pedidos
 just duckdb-consultas         # consultas SQL de exemplo
 just pilha-parar              # derruba os containers (dados ficam nos volumes)
 ```
@@ -364,7 +365,16 @@ porque um pedido em CPU passa disso (os nomes das métricas não mudam).
 [`analise_metrics.xlsx`](analise_metrics.xlsx) foi gerada com [`planilha_metrics.py`](planilha_metrics.py) a partir de duas
 fotos reais do `/metrics`, uma **antes** e outra **depois** de uma carga de 100 pedidos
 ([`metrics_antes.txt`](evidencias/metrics_antes.txt), [`metrics_depois.txt`](evidencias/metrics_depois.txt)). As células
-amarelas são **fórmulas**: cole outra foto nas colunas ANTES/DEPOIS e tudo se recalcula. O passo a passo:
+amarelas são **fórmulas**: cole outra foto nas colunas ANTES/DEPOIS e tudo se recalcula. Para refazer com os seus números:
+
+```bash
+just metrics-foto antes.txt      # ou: uv run python monitoring/planilha_metrics.py --foto antes.txt
+just carga 50
+just metrics-foto depois.txt
+just planilha antes.txt depois.txt   # ou: uv run python monitoring/planilha_metrics.py --antes antes.txt --depois depois.txt
+```
+
+O passo a passo do que a planilha calcula:
 
 1. **Por que duas fotos.** O `/metrics` só tem contadores **acumulados desde que o processo subiu**. Não há "últimos 5 minutos".
    O que aconteceu entre dois instantes é `depois − antes` (é o que `increase()` faz no Prometheus).

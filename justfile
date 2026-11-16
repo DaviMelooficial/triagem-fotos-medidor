@@ -67,6 +67,14 @@ referencia:
 analise rotulo="carga" *filtros="":
     uv run python monitoring/analise.py --rotulo {{rotulo}} {{filtros}}
 
+# Salva o /metrics de agora num arquivo (uma "foto" para a planilha)
+metrics-foto arquivo porta="3000":
+    uv run python monitoring/planilha_metrics.py --foto {{arquivo}} --url http://localhost:{{porta}}
+
+# Monta monitoring/analise_metrics.xlsx a partir de duas fotos do /metrics (antes e depois de uma carga)
+planilha antes depois:
+    uv run python monitoring/planilha_metrics.py --antes {{antes}} --depois {{depois}}
+
 # Sobe Prometheus, Loki, Promtail e Grafana (Docker); a API roda fora, na porta indicada
 pilha porta="3000":
     mkdir -p logs

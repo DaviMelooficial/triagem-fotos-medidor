@@ -11,7 +11,7 @@ janela AS (
     WHERE serie = 'bentoml_service_request_total' AND endpoint = '/extrair'
     GROUP BY http_code
 )
-SELECT http_code, pedidos, round(pedidos / sum(pedidos) OVER (), 4) AS fracao
+SELECT http_code, pedidos, round(pedidos / nullif(sum(pedidos) OVER (), 0), 4) AS fracao  -- sem pedido na janela: NULL
 FROM janela ORDER BY http_code;
 
 -- 2) Pedidos por intervalo de coleta (5 s): diferença entre coletas seguidas, como o increase() do Prometheus.

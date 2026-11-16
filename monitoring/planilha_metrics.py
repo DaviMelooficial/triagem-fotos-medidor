@@ -14,7 +14,8 @@ Uso:
   ... gere carga ...
   uv run python monitoring/planilha_metrics.py --foto depois.txt
   uv run python monitoring/planilha_metrics.py --antes antes.txt --depois depois.txt
-  Só --depois (sem --antes) = janela desde a subida do serviço.  (ou: just planilha)
+  Só --depois (sem --antes) = janela desde a subida do serviço.
+  Com just: just metrics-foto antes.txt; just carga 50; just metrics-foto depois.txt; just planilha antes.txt depois.txt
 """
 
 import argparse

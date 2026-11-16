@@ -12,7 +12,6 @@ Nunca gravamos a foto nem o nome do arquivo enviado; só números calculados del
 """
 
 import hashlib
-import io
 import json
 import logging
 import os
