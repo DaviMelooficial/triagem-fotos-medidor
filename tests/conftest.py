@@ -1,4 +1,9 @@
-"""Sobe o serviço de verdade (bentoml serve) uma vez para todos os testes de API."""
+"""Sobe o serviço de verdade (bentoml serve) uma vez por sessão de testes.
+
+- `url`: modo real, com Ollama (tests/test_api.py);
+- `servico_simulado`: BACKEND=simulado, sem Ollama, com o log numa pasta temporária e arquivos
+  pequenos para forçar a rotação (tests/test_monitoramento.py).
+"""
 
 import os
 import socket
@@ -49,5 +54,21 @@ def subir(env_extra: dict, home: Path) -> tuple[subprocess.Popen, str]:
 def url(tmp_path_factory):
     servidor, base = subir({"BACKEND": "ollama"}, tmp_path_factory.mktemp("bentoml_real"))
     yield base
+    servidor.terminate()
+    servidor.wait()
+
+
+@pytest.fixture(scope="session")
+def servico_simulado(tmp_path_factory):
+    pasta_log = tmp_path_factory.mktemp("logs")
+    env = {
+        "BACKEND": "simulado",
+        "SIMULADO_LATENCIA_S": "0.01",
+        "LOG_DIR": str(pasta_log),
+        "LOG_MAX_BYTES": "6000",  # ~3 pedidos por arquivo: a rotação acontece durante os testes
+        "LOG_BACKUPS": "50",
+    }
+    servidor, base = subir(env, tmp_path_factory.mktemp("bentoml_simulado"))
+    yield base, pasta_log
     servidor.terminate()
     servidor.wait()

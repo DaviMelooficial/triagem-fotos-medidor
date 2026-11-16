@@ -1,4 +1,8 @@
-"""Serviço HTTP (BentoML): recebe a foto de um medidor e devolve a extração em JSON."""
+"""Serviço HTTP (BentoML): recebe a foto de um medidor e devolve a extração em JSON.
+
+Monitoramento (ver monitoring/README.md): cada pedido ao /extrair vira linhas em logs/inferencia.jsonl,
+o /metrics traz as métricas do BentoML e as nossas, e GET /monitor/* devolve as variáveis do log.
+"""
 
 import io
 import os
@@ -12,8 +16,11 @@ from pydantic import WrapValidator
 from starlette.datastructures import UploadFile
 
 import extrator
+import monitor_api
+import monitoramento
 
 MENSAGEM_NAO_IMAGEM = "O arquivo enviado não é uma imagem válida. Envie uma foto JPEG ou PNG."
+MODELO_EM_USO = "simulado" if extrator.BACKEND == "simulado" else extrator.MODELO
 
 
 def abrir_foto(valor, proximo):
@@ -33,7 +40,7 @@ def abrir_foto(valor, proximo):
         except Exception:
             # InvalidArgument vira HTTP 400: o erro é de quem enviou, não do servidor.
             raise InvalidArgument(MENSAGEM_NAO_IMAGEM) from None
-        valor.bytes_enviados = bruto  # os bytes originais vão para o modelo
+        valor.bytes_enviados = bruto  # os bytes originais vão para o modelo e para o sha256 do log
     elif isinstance(valor, Image.Image) and not hasattr(valor, "bytes_enviados"):
         buffer = io.BytesIO()  # imagem já aberta (chamada direta em Python): gera os bytes
         valor.save(buffer, format=valor.format or "PNG")
@@ -48,7 +55,15 @@ Foto = Annotated[Image.Image, WrapValidator(abrir_foto)]
 TIMEOUT = int(os.environ.get("TIMEOUT_SEGUNDOS") or 300)
 
 
-@bentoml.service(traffic={"timeout": TIMEOUT})
+@bentoml.asgi_app(monitor_api.app, path="/monitor")
+@bentoml.service(
+    traffic={"timeout": TIMEOUT},
+    # 1 processo: o RotatingFileHandler não é seguro com vários processos escrevendo no mesmo arquivo.
+    workers=1,
+    # Faixas do histograma de latência do /metrics: as padrão do BentoML vão até 180 s; acrescentamos
+    # 300 e 600 s porque uma foto em CPU passa disso. Os nomes das métricas não mudam.
+    metrics={"duration": {"buckets": [0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0, 180.0, 300.0, 600.0]}},
+)
 class TriagemMedidor:
     def __init__(self):
         if extrator.BACKEND == "simulado":
@@ -62,9 +77,42 @@ class TriagemMedidor:
             raise RuntimeError(f"Modelo {extrator.MODELO} não encontrado. Rode: ollama pull {extrator.MODELO}")
 
     @bentoml.api
-    def extrair(self, foto: Foto) -> dict:
+    def extrair(self, foto: Foto, ctx: bentoml.Context) -> dict:
         """Recebe a foto (multipart, campo "foto") e devolve número, função, leitura e confiança."""
-        # Outros formatos (WebP, TIFF...) davam erro 500 no Ollama.
-        if foto.format not in ("JPEG", "PNG"):
-            raise InvalidArgument(f"Formato {foto.format} não aceito. Envie uma foto JPEG ou PNG.")
-        return extrator.extrair(foto.bytes_enviados)
+        # O middleware (monitoramento.RastroMiddleware) abriu o rastro deste pedido e grava o evento "resposta".
+        rastro = ctx.request.scope.setdefault(monitoramento.CHAVE_SCOPE, {})
+        try:
+            bruto = foto.bytes_enviados
+            entrada = monitoramento.variaveis_entrada(foto, bruto)
+            rastro["entrada"] = entrada
+            monitoramento.METRICA_LUMINANCIA.observe(entrada["media_l"])
+            # Evento gravado ANTES do modelo: se o processo morrer ou estourar o tempo, o pedido fica no log.
+            monitoramento.registrar(
+                {
+                    "evento": "pedido",
+                    "versao_log": monitoramento.VERSAO_LOG,
+                    "request_id": rastro.get("request_id"),
+                    "endpoint": "/extrair",
+                    "backend": extrator.BACKEND,
+                    "modelo": MODELO_EM_USO,
+                    "n_respostas": extrator.N_RESPOSTAS,
+                    "entrada": entrada,
+                }
+            )
+            # Outros formatos (WebP, TIFF...) davam erro 500 no Ollama.
+            if foto.format not in ("JPEG", "PNG"):
+                raise InvalidArgument(f"Formato {foto.format} não aceito. Envie uma foto JPEG ou PNG.")
+            resultado = extrator.extrair(bruto)
+            monitoramento.observar_resultado(rastro, resultado)
+            return resultado
+        except Exception as erro:
+            rastro["erro_tipo"] = type(erro).__name__  # o middleware grava junto com o status HTTP
+            raise
+
+
+TriagemMedidor.add_asgi_middleware(
+    monitoramento.RastroMiddleware,
+    backend=extrator.BACKEND,
+    modelo=MODELO_EM_USO,
+    n_respostas=extrator.N_RESPOSTAS,
+)
