@@ -1,0 +1,34 @@
+# Evidência: testes automatizados (2026-11-16, Mac M5, Ollama 0.32.7 aberto para os 6 de tests/test_api.py)
+$ uv run pytest -v
+tests/test_api.py::test_display_registro_103 PASSED                      [  3%]
+tests/test_api.py::test_display_registro_03 PASSED                       [  7%]
+tests/test_api.py::test_tampa_opaca_vai_para_revisao PASSED              [ 11%]
+tests/test_api.py::test_tampa_suja_vai_para_revisao PASSED               [ 14%]
+tests/test_api.py::test_arquivo_que_nao_e_imagem_devolve_400 PASSED      [ 18%]
+tests/test_api.py::test_imagem_webp_devolve_400 PASSED                   [ 22%]
+tests/test_drift.py::test_foto_escura_e_borrada_mudam_as_variaveis_certas PASSED [ 25%]
+tests/test_drift.py::test_ks_e_psi_nao_acusam_mesma_distribuicao_e_acusam_deslocada PASSED [ 29%]
+tests/test_drift.py::test_psi_com_amostra_pequena_nao_marca_drift_so_por_ruido PASSED [ 33%]
+tests/test_monitoramento.py::test_pedido_ok_gera_eventos_pedido_e_resposta PASSED [ 37%]
+tests/test_monitoramento.py::test_log_nao_guarda_nome_do_arquivo_nem_numeros_lidos PASSED [ 40%]
+tests/test_monitoramento.py::test_log_e_append_only PASSED               [ 44%]
+tests/test_monitoramento.py::test_arquivo_que_nao_e_imagem_devolve_400_e_fica_no_log PASSED [ 48%]
+tests/test_monitoramento.py::test_webp_devolve_400_com_variaveis_de_entrada_no_log PASSED [ 51%]
+tests/test_monitoramento.py::test_nome_de_arquivo_longo_e_content_type_image_jpg_funcionam PASSED [ 55%]
+tests/test_monitoramento.py::test_jpeg_cortado_devolve_400 PASSED        [ 59%]
+tests/test_monitoramento.py::test_monitor_variaveis_json_csv_e_filtros PASSED [ 62%]
+tests/test_monitoramento.py::test_monitor_resumo_e_drift PASSED          [ 66%]
+tests/test_monitoramento.py::test_metrics_formato_prometheus_com_metricas_proprias PASSED [ 70%]
+tests/test_monitoramento.py::test_sequencia_suspeita[000000-True] PASSED [ 74%]
+tests/test_monitoramento.py::test_sequencia_suspeita[0123456789-True] PASSED [ 77%]
+tests/test_monitoramento.py::test_sequencia_suspeita[09888-False] PASSED [ 81%]
+tests/test_monitoramento.py::test_sequencia_suspeita[None-False] PASSED  [ 85%]
+tests/test_monitoramento.py::test_sequencia_suspeita[12-False] PASSED    [ 88%]
+tests/test_votacao.py::test_tres_respostas_iguais_dao_confianca_1 PASSED [ 92%]
+tests/test_votacao.py::test_dois_contra_um_ganha_a_maioria_com_067 PASSED [ 96%]
+tests/test_votacao.py::test_tudo_diferente_da_033 PASSED                 [100%]
+======================== 27 passed in 140.05s (0:02:20) ========================
+
+# Os testes sobem os serviços com BENTOML_HOME próprio. Conferência: um serviço simulado aberto na porta 3300 durante o pytest manteve o /metrics:
+$ curl -s localhost:3300/metrics | grep request_total | grep /extrair | grep 200   (depois do pytest)
+bentoml_service_request_total{endpoint="/extrair",http_response_code="200",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 111.0

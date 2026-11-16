@@ -1,0 +1,41 @@
+# Prometheus coletando o /metrics (extra c) e guardando no banco próprio, o TSDB em volume Docker (extra d)
+# Pilha: PORTA_API=3300 docker compose -f monitoring/docker-compose.yml up -d ; consultas logo depois da carga 'misto' de 100 pedidos
+
+$ curl -s localhost:9090/api/v1/targets  (resumo)
+triagem-medidor http://host.docker.internal:3300/metrics health=up lastScrape=2026-11-16T23:19:22.135536218Z erro=''
+
+$ flags de retenção do Prometheus
+{'storage.tsdb.retention.time': '15d', 'storage.tsdb.retention.size': '1GiB', 'storage.tsdb.path': '/prometheus'}
+
+$ PromQL: sum by (http_response_code) (increase(bentoml_service_request_total{endpoint="/extrair"}[10m]))
+success [({'http_response_code': '200'}, '96.37766502451952'), ({'http_response_code': '500'}, '0'), ({'http_response_code': '400'}, '3.1240634623468346')]
+
+$ PromQL: histogram_quantile(0.95, sum by (le) (rate(bentoml_service_request_duration_seconds_bucket{endpoint="/extrair"}[10m])))
+success [({}, '4.595696330938123')]
+
+$ PromQL: sum(rate(bentoml_service_request_total{endpoint="/extrair",http_response_code=~"[45].."}[10m])) / sum(rate(bentoml_service_request_total{endpoint="/extrair"}[10m]))
+success [({}, '0.030869431799453197')]
+
+$ PromQL: sum by (status, precisa_revisao) (triagem_predicoes_total)
+success [({'precisa_revisao': 'true', 'status': 'ok'}, '29'), ({'precisa_revisao': 'sem_resultado', 'status': 'erro_cliente'}, '5'), ({'precisa_revisao': 'false', 'status': 'ok'}, '66')]
+
+$ regras gravadas (avaliadas a cada 5 s)
+recording triagem:taxa_erro:5m ok 
+recording triagem:latencia_p50:5m ok 
+recording triagem:latencia_p95:5m ok 
+recording triagem:fracao_revisao:5m ok 
+alerting TriagemTaxaErroAlta ok inactive
+alerting TriagemLatenciaAlta ok inactive
+
+# Persistência: o histórico sobrevive a reiniciar o container (fica no volume triagem-monitoramento_prometheus-dados)
+$ PromQL (time=1794871175): count_over_time(bentoml_service_request_total{endpoint="/extrair",http_response_code="200"}[1h])
+antes de reiniciar:
+[[1794871175, '105']]
+ Container triagem-monitoramento-prometheus-1 Started 
+depois de 'docker compose restart prometheus' (mesmo instante consultado):
+[[1794871175, '105']]
+
+$ docker volume ls | grep prometheus
+local     triagem-monitoramento_prometheus-dados
+
+# Por que 96,4 e 3,1 e não 95 e 5: increase() extrapola até as bordas da janela, e a série do código 400 só passou a existir no primeiro 400 (o Prometheus não supõe que ela valia 0 antes). Contagem exata da janela: planilha ou DuckDB (95 e 5).

@@ -1,0 +1,44 @@
+# Cargas geradas com o serviço no modo simulado (BACKEND=simulado), porta 3300, 2026-11-16
+# As janelas de tempo abaixo são as usadas na análise KS/PSI (monitoring/analise/).
+
+## perfil normal (início 2026-11-16T20:03:04-03:00)
+$ uv run python monitoring/gerar_carga.py --n 200 --perfil normal --url http://localhost:3300 --seed 7
+Enviando 200 pedidos para http://localhost:3300/extrair (perfil normal, seed 7, 2 em paralelo)
+status HTTP: {200: 169, 400: 31}
+tipos enviados: {'invalido_gif': 7, 'invalido_jpeg_cortado': 13, 'invalido_texto': 7, 'invalido_webp': 4, 'normal': 169}
+latência dos 200 (cliente): mediana 2.39 s, p95 2.95 s, máx 3.28 s
+
+## perfil drift (início 2026-11-16T20:06:52-03:00, fim 2026-11-16T20:10:30-03:00)
+$ uv run python monitoring/gerar_carga.py --n 200 --perfil drift --url http://localhost:3300 --seed 8
+Enviando 200 pedidos para http://localhost:3300/extrair (perfil drift, seed 8, 2 em paralelo)
+status HTTP: {200: 173, 400: 27}
+tipos enviados: {'drift_borrada': 28, 'drift_escura': 23, 'drift_estourada': 30, 'drift_girada_90': 33, 'drift_pequena': 33, 'drift_preto_e_branco': 26, 'invalido_gif': 5, 'invalido_jpeg_cortado': 10, 'invalido_texto': 3, 'invalido_webp': 9}
+latência dos 200 (cliente): mediana 2.41 s, p95 3.13 s, máx 3.58 s
+
+## perfil misto, com Prometheus, DuckDB e fotos do /metrics antes/depois (início 2026-11-16T20:16:07-03:00, fim 2026-11-16T20:18:09-03:00)
+$ uv run python monitoring/gerar_carga.py --n 100 --url http://localhost:3300 --seed 12
+Enviando 100 pedidos para http://localhost:3300/extrair (perfil misto, seed 12, 2 em paralelo)
+status HTTP: {200: 95, 400: 5}
+tipos enviados: {'drift_borrada': 5, 'drift_escura': 5, 'drift_estourada': 4, 'drift_girada_90': 4, 'drift_pequena': 3, 'drift_preto_e_branco': 9, 'invalido_gif': 1, 'invalido_jpeg_cortado': 2, 'invalido_webp': 2, 'normal': 65}
+latência dos 200 (cliente): mediana 2.34 s, p95 3.05 s, máx 3.33 s
+
+# rastro evoluindo durante 'just carga 20' (serviço simulado na porta 3300)
+$ uv run python monitoring/gerar_carga.py --n 20 --url http://localhost:3300 --seed 21 &   # em paralelo:
+$ while ...; do wc -l < logs/inferencia.jsonl; sleep 5; done
+20:20:10 linhas no log: 1161
+20:20:15 linhas no log: 1170
+20:20:20 linhas no log: 1178
+20:20:25 linhas no log: 1186
+20:20:30 linhas no log: 1201
+20:20:35 linhas no log: 1201
+
+Enviando 20 pedidos para http://localhost:3300/extrair (perfil misto, seed 21, 2 em paralelo)
+  10/20 enviados (10 s)
+  20/20 enviados (18 s)
+status HTTP: {200: 16, 400: 4}
+tipos enviados: {'drift_borrada': 1, 'drift_escura': 1, 'drift_estourada': 3, 'drift_girada_90': 1, 'drift_pequena': 1, 'invalido_gif': 1, 'invalido_webp': 3, 'normal': 9}
+latência dos 200 (cliente): mediana 2.01 s, p95 2.58 s, máx 2.58 s
+
+$ tail -n 2 logs/inferencia.jsonl   (um par pedido/resposta; a linha resposta repete a entrada para cada linha bastar sozinha na análise)
+{"ts":"2026-11-16T20:20:28.866010-03:00","ts_epoch":1794871228.86601,"evento":"pedido","versao_log":1,"request_id":"212e065f52434f94b28e4e73a3bd55f7","endpoint":"/extrair","backend":"simulado","modelo":"simulado","n_respostas":3,"entrada":{"sha256":"b5251da16437dabf4609640c5d7b82afbfc613efbc00d44c11b18f8d5f97c780","bytes":160708,"formato":"JPEG","modo_cor":"RGB","largura":1200,"altura":1600,"megapixels":1.92,"razao_aspecto":0.75,"bytes_por_pixel":0.0837,"tem_exif":false,"media_l":224.173,"media_r":226.822,"media_g":225.336,"media_b":211.167,"contraste_l":43.933,"croma_medio":0.0733,"nitidez_laplaciano":545.26,"frac_escuros":0.0004,"frac_estourados":0.6707,"entropia_l":2.242,"hist_l":[3e-05,0.00036,0.00076,0.00153,0.00318,0.00745,0.01355,0.01911,0.02623,0.04233,0.0515,0.05264,0.05425,0.05638,0.06871,0.602]}}
+{"ts":"2026-11-16T20:20:30.072429-03:00","ts_epoch":1794871230.072429,"evento":"resposta","versao_log":1,"request_id":"212e065f52434f94b28e4e73a3bd55f7","endpoint":"/extrair","backend":"simulado","modelo":"simulado","n_respostas":3,"http_status":200,"status":"ok","erro_tipo":null,"erro_msg":null,"latencia_total_s":1.2715,"corpo_bytes":160879,"entrada":{"sha256":"b5251da16437dabf4609640c5d7b82afbfc613efbc00d44c11b18f8d5f97c780","bytes":160708,"formato":"JPEG","modo_cor":"RGB","largura":1200,"altura":1600,"megapixels":1.92,"razao_aspecto":0.75,"bytes_por_pixel":0.0837,"tem_exif":false,"media_l":224.173,"media_r":226.822,"media_g":225.336,"media_b":211.167,"contraste_l":43.933,"croma_medio":0.0733,"nitidez_laplaciano":545.26,"frac_escuros":0.0004,"frac_estourados":0.6707,"entropia_l":2.242,"hist_l":[3e-05,0.00036,0.00076,0.00153,0.00318,0.00745,0.01355,0.01911,0.02623,0.04233,0.0515,0.05264,0.05425,0.05638,0.06871,0.602]},"saida":{"precisa_revisao":true,"confianca_geral":0.33,"confianca_numero_medidor":0.67,"confianca_funcao":1.0,"confianca_leitura":0.33,"campos_nulos":[],"n_campos_nulos":0,"respostas_identicas":false,"votos_distintos_leitura":3,"funcao":"kvarh","leitura_n_digitos":10,"numero_medidor_n_caracteres":10,"leitura_suspeita":true,"latencia_modelo_s":1.204,"latencia_chamada_media_s":0.401,"latencia_chamada_max_s":0.446,"latencias_chamadas_s":[0.43,0.446,0.328]}}
