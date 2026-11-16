@@ -34,7 +34,10 @@ VARIAVEIS_ENTRADA = [
     "megapixels", "razao_aspecto", "bytes_por_pixel", "media_l", "media_r", "media_g", "media_b",
     "contraste_l", "croma_medio", "nitidez_laplaciano", "frac_escuros", "frac_estourados", "entropia_l",
 ]
-VARIAVEIS_SAIDA = ["confianca_geral", "precisa_revisao", "n_campos_nulos", "leitura_suspeita"]
+VARIAVEIS_SAIDA = [
+    "confianca_geral", "confianca_numero_medidor", "confianca_funcao", "confianca_leitura", "precisa_revisao",
+    "n_campos_nulos", "leitura_suspeita", "respostas_identicas", "votos_distintos_leitura", "leitura_n_digitos", "funcao",
+]
 
 
 def main() -> None:
@@ -51,12 +54,13 @@ def main() -> None:
             for v in VARIAVEIS_ENTRADA:
                 valores[f"entrada.{v}"].append(entrada[v])
             for v in VARIAVEIS_SAIDA:
-                valores[f"saida.{v}"].append(float(saida[v]))
+                valores[f"saida.{v}"].append(saida[v])  # como no log: número, booleano ou texto (função)
             hist_soma = [a + b for a, b in zip(hist_soma, entrada["hist_l"])]
     n = len(valores["entrada.media_l"])
     referencia = {
         "descricao": f"4 fotos de exemplos/ x {VARIACOES_POR_FOTO} variações leves (seed {SEED}); saída do backend simulado",
         "gerado_em": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "backend": "simulado",  # o /monitor/drift compara só com linhas deste backend
         "n": n,
         "hist_l_soma": [round(x, 5) for x in hist_soma],
         "variaveis": valores,

@@ -2,13 +2,14 @@
 
 Lê o arquivo de log direto (inclusive os rotacionados), sem precisar do serviço rodando.
 Uso:
-  uv run python monitoring/analise.py --rotulo carga [--inicio 2026-11-16T20:00] [--fim ...]
-  (ou: just analise carga)
-Saída em monitoring/analise/: <rotulo>_ks_psi.txt, <rotulo>_histogramas.svg, <rotulo>_boxplots.svg, <rotulo>_latencia.svg
+  uv run python monitoring/analise.py <carga_id>              (o rótulo que o gerar_carga.py imprime)
+  uv run python monitoring/analise.py --inicio 2026-11-16T20:00 [--fim ...] [--rotulo nome]
+  (ou: just analise <carga_id>)
+Saída em monitoring/saida/ (fora do git): <rotulo>_ks_psi.txt, _histogramas.svg, _boxplots.svg, _latencia.svg.
+Os resultados versionados da entrega estão em monitoring/analise/ (gerados com --saida monitoring/analise).
 """
 
 import argparse
-import math
 import sys
 from pathlib import Path
 
@@ -25,7 +26,7 @@ import drift  # noqa: E402
 import monitor_api  # noqa: E402
 import monitoramento  # noqa: E402
 
-PASTA = Path(__file__).resolve().parent / "analise"
+PASTA = Path(__file__).resolve().parent / "saida"  # fora do git; os resultados da entrega estão em analise/
 COR_REF, COR_LOTE, TINTA, TINTA_FRACA = "#2a78d6", "#eb6834", "#1f1f1e", "#6b6a63"
 GRAFICOS = [
     ("entrada.media_l", "luminância média (0-255)"),
@@ -106,53 +107,88 @@ def latencia(todas, rotulo) -> Path:
     return caminho
 
 
+def _resumo_categorico(v: dict) -> str:
+    """Ex.: 0.33: 4% -> 12% | 1: 70% -> 52% (categorias que mudam mais primeiro)."""
+    cats = sorted(set(v["proporcoes_ref"]) | set(v["proporcoes_lote"]),
+                  key=lambda c: -abs(v["proporcoes_lote"].get(c, 0) - v["proporcoes_ref"].get(c, 0)))
+    return " | ".join(f"{c}: {100 * v['proporcoes_ref'].get(c, 0):.0f}% -> {100 * v['proporcoes_lote'].get(c, 0):.0f}%" for c in cats[:3])
+
+
 def main() -> None:
+    global PASTA
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--rotulo", default="carga")
+    parser.add_argument("carga_id", nargs="?", help="só os pedidos com este carga_id (impresso pelo gerar_carga.py)")
+    parser.add_argument("--rotulo", help="prefixo dos arquivos de saída (padrão: o carga_id ou 'carga')")
     parser.add_argument("--inicio")
     parser.add_argument("--fim")
+    parser.add_argument("--backend", help="padrão: o backend da referência (simulado)")
+    parser.add_argument("--saida", type=Path, default=PASTA, help="pasta dos resultados (padrão: monitoring/saida/)")
     args = parser.parse_args()
-    filtros = {"inicio": args.inicio, "fim": args.fim, "evento": "resposta"}
+    PASTA = args.saida
+    rotulo = args.rotulo or args.carga_id or "carga"
+    ref = drift.carregar_referencia()
+    backend = args.backend or ref.get("backend")
+    filtros = {"inicio": args.inicio, "fim": args.fim, "evento": "resposta", "carga_id": args.carga_id, "backend": backend}
     todas = monitor_api.filtrar(filtros)
     ok = [linha for linha in todas if linha.get("status") == "ok"]
-    ref = drift.carregar_referencia()
     if not ok:
-        sys.exit(f"Nenhuma resposta 200 em {monitoramento.ARQUIVO_LOG} nesse intervalo. Rode a carga antes (just carga 100).")
+        sys.exit(f"Nenhuma resposta 200 do backend {backend} em {monitoramento.ARQUIVO_LOG} com esse filtro. "
+                 "Rode a carga antes (just carga 100).")
     resultado = drift.comparar(ok, ref)
-    PASTA.mkdir(exist_ok=True)
+    PASTA.mkdir(parents=True, exist_ok=True)
     n, m = ref["n"], len(ok)
-    d_critico = 1.358 * math.sqrt((n + m) / (n * m))  # menor distância KS detectável com alfa 0,05
     status = {}
     for linha in todas:
         status[linha["status"]] = status.get(linha["status"], 0) + 1
+    filtro_txt = f"carga_id={args.carga_id}" if args.carga_id else f"intervalo {args.inicio or 'início'} a {args.fim or 'fim'}"
+    alfa_b = resultado["alfa_bonferroni"]
     linhas_txt = [
-        f"Análise do log '{args.rotulo}' ({monitoramento.ARQUIVO_LOG.name} e rotacionados), intervalo: {args.inicio or 'início'} a {args.fim or 'fim'}",
-        f"eventos resposta: {len(todas)} {status}; usados no KS/PSI (status ok): {m}; referência: {n}",
-        f"KS: com n_ref={n} e n_lote={m}, só diferenças D >= {d_critico:.3f} são detectáveis com alfa 0,05",
+        f"Análise do log ({monitoramento.ARQUIVO_LOG.name} e rotacionados), {filtro_txt}, backend {backend}",
+        f"eventos resposta: {len(todas)} {status}; usados nos testes (status ok): {m}; referência: {n}",
+        f"{resultado['n_testes']} testes ({len(drift.VARIAVEIS)} variáveis + KS por pixel); alfa 0,05; Bonferroni: p < 0,05/{resultado['n_testes']} = {alfa_b:.4f}",
+        f"KS: com estes n, D precisa passar de {resultado['ks_d_critico']} para dar p < 0,05 e de "
+        f"{resultado['ks_d_critico_bonferroni']} com Bonferroni (valor crítico, não é o poder do teste)",
         "",
-        f"{'variável':30s} {'média ref':>10s} {'média log':>10s} {'KS D':>7s} {'KS p':>9s} {'PSI':>7s} {'lim.ruído':>9s}  drift?",
+        "Contínuas (KS):",
+        f"{'variável':30s} {'média ref':>10s} {'média log':>10s} {'KS D':>7s} {'p':>9s} {'PSI':>7s} {'lim.ruído':>9s}  drift?",
     ]
-    for nome, v in resultado["variaveis"].items():
+
+    def marca(v):
+        return ("teste" + ("+Bonf " if v["drift_bonferroni"] else " ") if v["drift"] else "") + ("PSI" if v["psi_drift"] else "") or "-"
+
+    for nome in drift.CONTINUAS:
+        v = resultado["variaveis"][nome]
         if "erro" in v:
             linhas_txt.append(f"{nome:30s} {v['erro']}")
             continue
-        marca = ("KS " if v["ks_drift"] else "") + ("PSI" if v["psi_drift"] else "")
         linhas_txt.append(
-            f"{nome:30s} {v['media_ref']:10.4g} {v['media_lote']:10.4g} {v['ks_estatistica']:7.3f} {v['ks_p_valor']:9.3g} "
-            f"{v['psi']:7.3f} {v['psi_limite_ruido_95']:9.3f}  {marca or '-'}"
+            f"{nome:30s} {v['media_ref']:10.4g} {v['media_lote']:10.4g} {v['estatistica']:7.3f} {v['p_valor']:9.3g} "
+            f"{v['psi']:7.3f} {v['psi_limite_ruido_95']:9.3f}  {marca(v)}"
         )
+    linhas_txt += ["", "Discretas/categóricas (qui-quadrado; Fisher se esperado < 5):",
+                   f"{'variável':32s} {'teste':>17s} {'p':>9s} {'PSI':>7s} {'lim.ruído':>9s}  drift?  maiores mudanças (ref -> log)"]
+    for nome in drift.CATEGORICAS:
+        v = resultado["variaveis"][nome]
+        if "erro" in v:
+            linhas_txt.append(f"{nome:32s} {v['erro']}")
+            continue
+        linhas_txt.append(f"{nome:32s} {v['teste']:>17s} {v['p_valor']:9.3g} {v['psi']:7.3f} {v['psi_limite_ruido_95']:9.3f}  "
+                          f"{marca(v):6s}  {_resumo_categorico(v)}")
+    revisao = resultado["variaveis"].get("saida.precisa_revisao", {}).get("diferenca")
+    if revisao:
+        linhas_txt.append(f"\nprecisa_revisao (KPI): {100 * revisao['fracao_ref']:.1f}% na referência -> {100 * revisao['fracao_lote']:.1f}% no log; "
+                          f"diferença {revisao['diferenca_pp']:+.1f} pp, IC 95% [{revisao['ic95_pp'][0]:+.1f}; {revisao['ic95_pp'][1]:+.1f}] pp")
     px = resultado.get("ks_pixels_luminancia")
     if px:
-        linhas_txt.append(f"\nKS por pixel (histograma de L somado, como na aula 003): D={px['estatistica']}, p={px['p_valor']}, drift={px['drift']}")
-    linhas_txt.append(f"\nCom drift no KS (p < 0,05): {resultado['variaveis_com_drift_ks'] or 'nenhuma'}")
-    linhas_txt.append(f"Com drift no KS corrigido por Bonferroni (p < 0,05/{len(resultado['variaveis'])} = {resultado['alfa_bonferroni']:.4f}): "
-                      f"{resultado['variaveis_com_drift_ks_bonferroni'] or 'nenhuma'}")
-    linhas_txt.append(f"Com drift no PSI (> 0,25 e acima do ruído): {resultado['variaveis_com_drift_psi'] or 'nenhuma'}")
+        linhas_txt.append(f"KS por pixel (histograma de L somado, como na aula 003): D={px['estatistica']}, p={px['p_valor']}, drift={px['drift']}")
+    linhas_txt.append(f"\nCom drift (p < 0,05): {resultado['variaveis_com_drift'] or 'nenhuma'}")
+    linhas_txt.append(f"Com drift após Bonferroni (p < {alfa_b:.4f}): {resultado['variaveis_com_drift_bonferroni'] or 'nenhuma'}")
+    linhas_txt.append(f"Com drift no PSI (> 0,25 e acima do ruído; sem correção de multiplicidade): {resultado['variaveis_com_drift_psi'] or 'nenhuma'}")
     texto = "\n".join(linhas_txt)
-    (PASTA / f"{args.rotulo}_ks_psi.txt").write_text(texto + "\n", encoding="utf-8")
+    (PASTA / f"{rotulo}_ks_psi.txt").write_text(texto + "\n", encoding="utf-8")
     print(texto)
-    for caminho in (histogramas(ok, ref, args.rotulo), boxplots(ok, ref, args.rotulo), latencia(todas, args.rotulo)):
-        print("gráfico:", caminho.relative_to(RAIZ))
+    for caminho in (histogramas(ok, ref, rotulo), boxplots(ok, ref, rotulo), latencia(todas, rotulo)):
+        print("gráfico:", caminho)
 
 
 if __name__ == "__main__":
