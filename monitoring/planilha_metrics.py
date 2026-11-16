@@ -20,6 +20,9 @@ Uso:
 
 import argparse
 import math
+import shutil
+import subprocess
+import tempfile
 from collections import defaultdict
 from pathlib import Path
 
@@ -77,13 +80,13 @@ def aba_latencia(livro, antes: dict, depois: dict) -> None:
     aba["A2"] = "Amarelo = fórmula. Buckets são CUMULATIVOS: o bucket le=5 conta todos os pedidos com duração <= 5 s."
     _cabecalho(aba, 4, ["le (limite superior, s)", "cumulativo ANTES", "cumulativo DEPOIS", "cumulativo na janela",
                         "limite inferior (s)", "pedidos nesta faixa", "fração", "cumulativo anterior", "rótulo da faixa"])
-    limites = sorted(depois["buckets"])
+    limites = sorted(set(depois["buckets"]) | set(antes["buckets"]))  # faixas fixas do service.py
     primeira = 5
     for i, le in enumerate(limites):
         linha = primeira + i
         aba.cell(linha, 1, "+Inf" if math.isinf(le) else le)
         aba.cell(linha, 2, antes["buckets"].get(le, 0))
-        aba.cell(linha, 3, depois["buckets"][le])
+        aba.cell(linha, 3, depois["buckets"].get(le, 0))
         aba.cell(linha, 4, f"=C{linha}-B{linha}")
         aba.cell(linha, 5, 0 if i == 0 else f"=A{linha - 1}")
         aba.cell(linha, 6, f"=D{linha}" if i == 0 else f"=D{linha}-D{linha - 1}")  # diferença de cumulativos
@@ -101,8 +104,13 @@ def aba_latencia(livro, antes: dict, depois: dict) -> None:
     aba.cell(base, 1, "Resumo da janela").font = NEGRITO
     aba.cell(base + 1, 1, "pedidos (count)")
     aba.cell(base + 1, 2, f"=D{ultima}")
-    aba.cell(base + 2, 1, "soma das durações (s)")
-    aba.cell(base + 2, 2, depois["soma"] - antes["soma"])
+    aba.cell(base + 2, 1, "soma das durações (s) = _sum DEPOIS - _sum ANTES")
+    aba.cell(base + 2, 2, f"=D{base + 2}-C{base + 2}")
+    aba.cell(base + 2, 3, antes["soma"])  # _sum colado da foto ANTES
+    aba.cell(base + 2, 4, depois["soma"])  # _sum colado da foto DEPOIS
+    aba.cell(base + 1, 3, "_sum ANTES (colar)")
+    aba.cell(base + 1, 4, "_sum DEPOIS (colar)")
+    aba.cell(base + 2, 2).fill = FORMULA
     aba.cell(base + 3, 1, "média (s) = soma / count")
     aba.cell(base + 3, 2, f"=IF(B{base + 1}=0,0,B{base + 2}/B{base + 1})")
     linha_q = base + 5
@@ -183,13 +191,16 @@ def aba_erros(livro, antes: dict, depois: dict) -> None:
     aba = livro.create_sheet("erros")
     _titulo(aba, 1, "Taxa de erro a partir de bentoml_service_request_total (janela = depois - antes)")
     _cabecalho(aba, 3, ["endpoint", "código HTTP", "total ANTES", "total DEPOIS", "pedidos na janela"])
-    chaves = sorted(depois["totais"])
+    # Linhas fixas para 200/400/500 do /extrair, mais qualquer outra que apareça nas fotos. Se colar uma foto
+    # com um código que não tem linha (ex.: 422), insira uma linha DENTRO do intervalo: as somas se ajustam.
+    fixas = {(ENDPOINT, 200), (ENDPOINT, 400), (ENDPOINT, 500)}
+    chaves = sorted(fixas | set(depois["totais"]) | set(antes["totais"]))
     for i, (endpoint, codigo) in enumerate(chaves):
         linha = 4 + i
         aba.cell(linha, 1, endpoint)
         aba.cell(linha, 2, codigo)
         aba.cell(linha, 3, antes["totais"].get((endpoint, codigo), 0))
-        aba.cell(linha, 4, depois["totais"][(endpoint, codigo)])
+        aba.cell(linha, 4, depois["totais"].get((endpoint, codigo), 0))
         aba.cell(linha, 5, f"=D{linha}-C{linha}").fill = FORMULA
     ultima = 3 + len(chaves)
     r = ultima + 2
@@ -251,11 +262,29 @@ def aba_leiame(livro, antes: Path | None, depois: Path) -> None:
         "A diferença DEPOIS - ANTES dá o que aconteceu entre as duas fotos (o mesmo que increase() no Prometheus).",
         "",
         "Abas: latencia (histograma, quantis e boxplot), erros (taxa de erro), promql (as mesmas contas no Prometheus).",
-        "Células amarelas são fórmulas: troque os números das colunas ANTES/DEPOIS por outra foto e tudo se recalcula.",
+        "Células amarelas são fórmulas: troque os números das colunas ANTES/DEPOIS (buckets, _sum da latência e request_total)",
+        "por outra foto e tudo se recalcula. Código HTTP sem linha na aba erros: insira uma linha dentro da tabela.",
+        "O arquivo é gravado sem valores calculados: abra no Excel, LibreOffice ou Google Planilhas (calculam ao abrir).",
     ]
     for i, texto in enumerate(textos, start=1):
         aba.cell(i, 1, texto)
     aba.column_dimensions["A"].width = 130
+
+
+def recalcular(caminho: Path) -> bool:
+    """Grava os valores calculados no arquivo (para quem lê sem abrir num app de planilha) com o LibreOffice
+    headless, se estiver instalado. Mantém as fórmulas e os gráficos. Devolve False se não houver LibreOffice."""
+    soffice = shutil.which("soffice") or next(
+        (c for c in ["/Applications/LibreOffice.app/Contents/MacOS/soffice", r"C:\Program Files\LibreOffice\program\soffice.exe"]
+         if Path(c).exists()), None)
+    if not soffice:
+        return False
+    with tempfile.TemporaryDirectory() as pasta:
+        perfil = Path(pasta, "perfil").as_uri()  # perfil próprio: não briga com um LibreOffice aberto
+        subprocess.run([soffice, f"-env:UserInstallation={perfil}", "--headless", "--convert-to", "xlsx",
+                        "--outdir", str(Path(pasta, "saida")), str(caminho)], check=True, capture_output=True, timeout=180)
+        shutil.copyfile(Path(pasta, "saida", caminho.name), caminho)
+    return True
 
 
 def main() -> None:
@@ -264,7 +293,9 @@ def main() -> None:
     parser.add_argument("--foto", type=Path, help="só salva o /metrics atual neste arquivo")
     parser.add_argument("--antes", type=Path)
     parser.add_argument("--depois", type=Path)
-    parser.add_argument("--saida", type=Path, default=PASTA / "analise_metrics.xlsx")
+    # Padrão fora do git: quem refaz a planilha não sobrescreve a da entrega (monitoring/analise_metrics.xlsx).
+    parser.add_argument("--saida", type=Path, default=PASTA / "saida" / "analise_metrics.xlsx")
+    parser.add_argument("--recalcular", action="store_true", help="grava os valores calculados com o LibreOffice, se houver")
     args = parser.parse_args()
     if args.foto:
         args.foto.write_text(httpx.get(f"{args.url}/metrics", timeout=10).text, encoding="utf-8")
@@ -280,8 +311,13 @@ def main() -> None:
     aba_latencia(livro, antes, depois)
     aba_erros(livro, antes, depois)
     aba_promql(livro)
+    # openpyxl grava fórmulas sem o valor calculado: pede ao Excel/LibreOffice/Sheets para calcular tudo ao abrir.
+    livro.calculation.fullCalcOnLoad = True
+    args.saida.parent.mkdir(parents=True, exist_ok=True)
     livro.save(args.saida)
     print(f"planilha salva em {args.saida}")
+    if args.recalcular:
+        print("valores calculados gravados (LibreOffice)" if recalcular(args.saida) else "LibreOffice não encontrado: valores calculam ao abrir")
 
 
 if __name__ == "__main__":

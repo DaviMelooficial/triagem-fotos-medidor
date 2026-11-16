@@ -21,3 +21,6 @@ logs/*
 !logs/.gitkeep
 monitoring/*.duckdb
 monitoring/*.duckdb.wal
+
+# Saída padrão dos scripts de análise e planilha (os resultados da entrega ficam em monitoring/analise/)
+monitoring/saida/
