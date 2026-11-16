@@ -8,6 +8,7 @@ e o /metrics no formato Prometheus.
 import io
 import json
 import re
+import time
 from pathlib import Path
 
 import httpx
@@ -31,8 +32,14 @@ def conteudo_do_log(pasta: Path) -> str:
 
 
 def eventos(pasta: Path, request_id: str) -> list[dict]:
-    linhas = [json.loads(linha) for linha in conteudo_do_log(pasta).splitlines()]
-    return [e for e in linhas if e["request_id"] == request_id]
+    # O evento "resposta" é gravado logo DEPOIS de a resposta HTTP sair: espera até 2 s por ele.
+    for _ in range(40):
+        linhas = [json.loads(linha) for linha in conteudo_do_log(pasta).splitlines()]
+        achados = [e for e in linhas if e["request_id"] == request_id]
+        if any(e["evento"] == "resposta" for e in achados):
+            return achados
+        time.sleep(0.05)
+    return achados
 
 
 def test_pedido_ok_gera_eventos_pedido_e_resposta(servico_simulado):
@@ -102,6 +109,39 @@ def test_nome_de_arquivo_longo_e_content_type_image_jpg_funcionam(servico_simula
     assert enviar(base, tipo="image/jpg").status_code == 200  # o conversor padrão do BentoML dava 500
 
 
+def test_corpo_json_devolve_400(servico_simulado):
+    # Antes: o texto "x" chegava ao endpoint e dava 500 (AttributeError).
+    base, pasta = servico_simulado
+    resposta = httpx.post(f"{base}/extrair", json={"foto": "x"}, timeout=60)
+    assert resposta.status_code == 400 and "não é uma imagem válida" in resposta.text
+    (final,) = eventos(pasta, resposta.headers["x-request-id"])
+    assert final["status"] == "erro_cliente"
+
+
+@pytest.mark.parametrize("campos", [{"arquivo": ("f.jpg", FOTO, "image/jpeg")}, {"foto": (None, "http://example.com/a.jpg")}])
+def test_multipart_sem_arquivo_no_campo_foto_devolve_400(servico_simulado, campos):
+    # Campo com outro nome dava 500 (UnicodeDecodeError no BentoML); "foto" como texto virava download de URL.
+    base, pasta = servico_simulado
+    resposta = httpx.post(f"{base}/extrair", files=campos, timeout=60)
+    assert resposta.status_code == 400 and 'campo multipart \\"foto\\"' in resposta.text
+    (final,) = eventos(pasta, resposta.headers["x-request-id"])
+    assert final["erro_tipo"] == "campo_foto_ausente" and final["corpo_bytes"] > 0
+
+
+def test_corpo_bytes_conta_upload_sem_content_length(servico_simulado):
+    base, pasta = servico_simulado
+
+    def pedacos():  # gerador = httpx manda em "chunked", sem Content-Length
+        yield b'--limite123\r\nContent-Disposition: form-data; name="foto"; filename="f.jpg"\r\n'
+        yield b"Content-Type: image/jpeg\r\n\r\n" + FOTO + b"\r\n--limite123--\r\n"
+
+    resposta = httpx.post(f"{base}/extrair", content=pedacos(), timeout=60,
+                          headers={"content-type": "multipart/form-data; boundary=limite123"})
+    assert resposta.status_code == 200
+    (_, final) = eventos(pasta, resposta.headers["x-request-id"])
+    assert final["corpo_bytes"] > len(FOTO)
+
+
 def test_jpeg_cortado_devolve_400(servico_simulado):
     base, _ = servico_simulado
     assert enviar(base, FOTO[: len(FOTO) // 3]).status_code == 400
@@ -136,9 +176,29 @@ def test_monitor_resumo_e_drift(servico_simulado):
     assert caixa["min"] <= caixa["q1"] <= caixa["mediana"] <= caixa["q3"] <= caixa["max"]
     assert sum(caixa["histograma"]["contagens"]) == caixa["n"]
     drift = httpx.get(f"{base}/monitor/drift").json()
-    assert drift["n_referencia"] == 200
+    assert drift["n_referencia"] == 200 and drift["backend_lote"] == "simulado"  # só o backend da referência
     v = drift["variaveis"]["entrada.media_l"]
-    assert 0 <= v["ks_estatistica"] <= 1 and 0 <= v["ks_p_valor"] <= 1 and v["psi"] >= 0
+    assert v["teste"] == "ks" and 0 <= v["estatistica"] <= 1 and 0 <= v["p_valor"] <= 1 and v["psi"] >= 0
+    revisao = drift["variaveis"]["saida.precisa_revisao"]
+    assert revisao["tipo"] == "categorica" and revisao["teste"] in ("qui2", "fisher") and "ic95_pp" in revisao["diferenca"]
+    assert drift["variaveis"]["saida.funcao"]["tipo"] == "categorica"
+    assert httpx.get(f"{base}/monitor/drift", params={"backend": "ollama"}).json()["n_lote"] == 0
+    assert httpx.get(f"{base}/monitor/drift", params={"alfa": "2"}).status_code == 400
+
+
+@pytest.mark.parametrize("parametros", [{"faixas": "0"}, {"faixas": "-3"}, {"faixas": "abc"}, {"limite": "-1"}, {"evento": "outro"}])
+def test_monitor_parametro_invalido_da_400(servico_simulado, parametros):
+    base, _ = servico_simulado
+    enviar(base)
+    assert httpx.get(f"{base}/monitor/resumo", params=parametros).status_code == 400
+
+
+def test_carga_id_vai_para_o_log_e_filtra(servico_simulado):
+    base, _ = servico_simulado
+    resposta = httpx.post(f"{base}/extrair", files={"foto": ("f.jpg", FOTO, "image/jpeg")}, headers={"X-Carga-Id": "teste-carga-1"}, timeout=60)
+    assert resposta.status_code == 200
+    linhas = httpx.get(f"{base}/monitor/variaveis", params={"carga_id": "teste-carga-1"}).json()["linhas"]
+    assert [linha["request_id"] for linha in linhas] == [resposta.headers["x-request-id"]]
 
 
 def test_metrics_formato_prometheus_com_metricas_proprias(servico_simulado):

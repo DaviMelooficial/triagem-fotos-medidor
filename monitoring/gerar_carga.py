@@ -5,6 +5,8 @@ Perfis (--perfil):
   drift   fotos escuras, estouradas, borradas, P&B, pequenas, giradas: KS/PSI devem acusar
   misto   70 % normal + 30 % drift (padrão)
 Em qualquer perfil, --invalidos (padrão 0,1) é a fração de arquivos que devem dar 400.
+Cada pedido leva o cabeçalho X-Carga-Id (padrão: <perfil>-<seed>), que o serviço grava no log como carga_id:
+a análise e o /monitor filtram por ele, sem depender de horário.
 
 Uso: uv run python monitoring/gerar_carga.py --n 100 [--perfil misto] [--url http://localhost:3000] [--paralelo 2]
      (ou: just carga 100)
@@ -41,13 +43,15 @@ def montar_pedidos(n: int, perfil: str, invalidos: float, seed: int) -> list[tup
     return pedidos
 
 
-def enviar(cliente: httpx.Client, url: str, pedido: tuple[str, bytes, str]) -> tuple[str, int, float]:
+def enviar(cliente: httpx.Client, url: str, pedido: tuple[str, bytes, str], carga_id: str) -> tuple[str, int, float]:
     tipo, conteudo, content_type = pedido
     # Nome genérico: o serviço nunca grava o nome do arquivo, mas não há por que mandar outro.
     extensao = content_type.split("/")[-1].replace("plain", "txt")
     inicio = time.perf_counter()
     try:
-        resposta = cliente.post(f"{url}/extrair", files={"foto": (f"foto.{extensao}", conteudo, content_type)})
+        resposta = cliente.post(
+            f"{url}/extrair", files={"foto": (f"foto.{extensao}", conteudo, content_type)}, headers={"X-Carga-Id": carga_id}
+        )
         status = resposta.status_code
     except httpx.HTTPError:
         status = 0  # sem resposta (timeout, conexão recusada)
@@ -63,15 +67,18 @@ def main() -> None:
     parser.add_argument("--paralelo", type=int, default=2, help="pedidos simultâneos (o serviço atende 1 por vez; o resto espera na fila)")
     parser.add_argument("--seed", type=int, default=None, help="fixa a sequência de fotos (padrão: aleatória)")
     parser.add_argument("--timeout", type=float, default=900)
+    parser.add_argument("--carga-id", help="rótulo gravado no log (padrão: <perfil>-<seed>)")
     args = parser.parse_args()
 
     seed = args.seed if args.seed is not None else random.randrange(1_000_000)
+    carga_id = args.carga_id or f"{args.perfil}-{seed}"
     pedidos = montar_pedidos(args.n, args.perfil, args.invalidos, seed)
     print(f"Enviando {len(pedidos)} pedidos para {args.url}/extrair (perfil {args.perfil}, seed {seed}, {args.paralelo} em paralelo)")
+    print(f"carga_id = {carga_id}  (filtre com: just analise {carga_id})")
     resultados = []
     inicio = time.perf_counter()
     with httpx.Client(timeout=args.timeout) as cliente, ThreadPoolExecutor(args.paralelo) as fila:
-        for i, resultado in enumerate(fila.map(lambda p: enviar(cliente, args.url, p), pedidos), start=1):
+        for i, resultado in enumerate(fila.map(lambda p: enviar(cliente, args.url, p, carga_id), pedidos), start=1):
             resultados.append(resultado)
             if i % 10 == 0 or i == len(pedidos):
                 print(f"  {i}/{len(pedidos)} enviados ({time.perf_counter() - inicio:.0f} s)", flush=True)

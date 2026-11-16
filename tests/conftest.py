@@ -52,7 +52,9 @@ def subir(env_extra: dict, home: Path) -> tuple[subprocess.Popen, str]:
 
 @pytest.fixture(scope="session")
 def url(tmp_path_factory):
-    servidor, base = subir({"BACKEND": "ollama"}, tmp_path_factory.mktemp("bentoml_real"))
+    # LOG_DIR temporário: os testes não escrevem no logs/inferencia.jsonl de um "just serve" aberto.
+    env = {"BACKEND": "ollama", "LOG_DIR": str(tmp_path_factory.mktemp("logs_real"))}
+    servidor, base = subir(env, tmp_path_factory.mktemp("bentoml_real"))
     yield base
     servidor.terminate()
     servidor.wait()

@@ -7,7 +7,8 @@ o BentoML) em /monitor com @bentoml.asgi_app, no service.py.
 - /monitor/resumo     por variável: n, mínimo, Q1, mediana, Q3, máximo, média (boxplot) e contagens por faixa (histograma)
 - /monitor/drift      KS e PSI de cada variável contra monitoring/referencia.json
 - /monitor/referencia os valores do conjunto de referência, para quem quiser fazer a própria conta
-Filtros comuns: inicio, fim (ISO 8601; sem fuso = hora local), evento (resposta|pedido|todos), status, backend, limite.
+Filtros comuns: inicio, fim (ISO 8601; sem fuso = hora local), evento (resposta|pedido|todos), status, backend,
+carga_id (rótulo que o gerador de carga manda no cabeçalho X-Carga-Id), limite. Parâmetro inválido = 400.
 """
 
 import csv
@@ -83,8 +84,14 @@ def filtrar(parametros) -> list[dict]:
             continue
         if parametros.get("backend") and e.get("backend") != parametros["backend"]:
             continue
+        if parametros.get("carga_id") and e.get("carga_id") != parametros["carga_id"]:
+            continue
         linhas.append(achatar(e))
+    if parametros.get("evento", "resposta") not in ("resposta", "pedido", "todos"):
+        raise ValueError("evento deve ser resposta, pedido ou todos")
     limite = int(parametros.get("limite") or 0)
+    if limite < 0:
+        raise ValueError("limite não pode ser negativo")
     return linhas[-limite:] if limite > 0 else linhas
 
 
@@ -115,6 +122,8 @@ async def resumo(request: Request) -> Response:
     try:
         linhas = filtrar(request.query_params)
         faixas = int(request.query_params.get("faixas") or 10)
+        if not 1 <= faixas <= 1000:
+            raise ValueError("faixas deve estar entre 1 e 1000")
     except ValueError as erro:
         return _erro_parametro(erro)
     contagem_status = {}
@@ -149,13 +158,24 @@ async def comparar_drift(request: Request) -> Response:
         parametros = dict(request.query_params)
         parametros["evento"] = "resposta"
         parametros["status"] = "ok"  # só pedidos que chegaram ao modelo têm entrada e saída completas
-        linhas = filtrar(parametros)
         alfa = float(request.query_params.get("alfa") or 0.05)
+        if not 0 < alfa < 1:
+            raise ValueError("alfa deve estar entre 0 e 1")
     except ValueError as erro:
         return _erro_parametro(erro)
     if not drift.ARQUIVO_REFERENCIA.is_file():
         return JSONResponse({"error": "monitoring/referencia.json não existe (rode: just referencia)"}, status_code=404)
-    return JSONResponse(drift.comparar(linhas, drift.carregar_referencia(), alfa=alfa))
+    referencia = drift.carregar_referencia()
+    # Compara só com o backend da referência (a nossa é do simulado): misturar com respostas do modelo
+    # real acusaria "drift" que é só troca de backend. ?backend=ollama compara mesmo assim, de propósito.
+    parametros.setdefault("backend", referencia.get("backend") or "")
+    try:
+        linhas = filtrar(parametros)
+    except ValueError as erro:
+        return _erro_parametro(erro)
+    resultado = drift.comparar(linhas, referencia, alfa=alfa)
+    resultado["backend_lote"] = parametros["backend"] or "todos"
+    return JSONResponse(resultado)
 
 
 async def referencia(_: Request) -> Response:

@@ -15,15 +15,19 @@ import hashlib
 import json
 import logging
 import os
+import re
 import time
 import uuid
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-import prometheus_client
 import numpy as np
+import prometheus_client
 from PIL import Image
+from starlette.datastructures import UploadFile
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 VERSAO_LOG = 1  # sobe quando o formato da linha mudar, para a análise saber ler as duas versões
 PASTA_LOG = Path(os.environ.get("LOG_DIR") or Path(__file__).parent / "logs")
@@ -190,6 +194,31 @@ def observar_resultado(rastro: dict, resultado: dict) -> None:
 # ---------------------------------------------------------------- middleware que fecha cada rastro
 
 
+CARGA_ID_VALIDO = re.compile(r"[A-Za-z0-9_.:-]{1,64}")
+MENSAGEM_SEM_FOTO = 'Envie a foto como arquivo no campo multipart "foto" (ex.: curl -F "foto=@foto.jpg").'
+
+
+async def _conferir_multipart(scope, corpo: bytes, cabecalhos: dict) -> str | None:
+    """Recusa (400) multipart sem um ARQUIVO no campo "foto". Sem isso o BentoML dava 500: com o campo
+    com outro nome ele tenta ler a foto como texto (UnicodeDecodeError), e com "foto" em texto ele trata
+    o texto como URL e tenta baixar."""
+    if not cabecalhos.get("content-type", "").startswith("multipart/form-data"):
+        return None  # JSON e outros: o validador do service.py responde 400
+
+    async def receber():
+        return {"type": "http.request", "body": corpo, "more_body": False}
+
+    try:
+        formulario = await Request(scope, receber).form()
+    except Exception:
+        return MENSAGEM_SEM_FOTO  # multipart malformado
+    try:
+        foto = formulario.get("foto")
+        return None if isinstance(foto, UploadFile) else MENSAGEM_SEM_FOTO
+    finally:
+        await formulario.close()
+
+
 class RastroMiddleware:
     """Middleware ASGI: mede o pedido inteiro e grava o evento "resposta", inclusive em erro 400/500."""
 
@@ -202,10 +231,38 @@ class RastroMiddleware:
             await self.app(scope, receive, send)
             return
         inicio = time.perf_counter()
-        cabecalhos = {k.decode("latin-1"): v.decode("latin-1") for k, v in scope.get("headers", [])}
-        rastro = {"request_id": uuid.uuid4().hex, "entrada": None, "saida": None, "erro_tipo": None}
+        cabecalhos = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers", [])}
+        carga = cabecalhos.get("x-carga-id", "")
+        rastro = {
+            "request_id": uuid.uuid4().hex,
+            # rótulo opcional mandado pelo gerador de carga; só aceito se for um nome curto e simples
+            "carga_id": carga if CARGA_ID_VALIDO.fullmatch(carga) else None,
+            "entrada": None,
+            "saida": None,
+            "erro_tipo": None,
+        }
         scope[CHAVE_SCOPE] = rastro  # o endpoint lê e preenche este mesmo dicionário
         resposta = {"status": 500, "corpo": b""}
+
+        # Lê o corpo inteiro (o BentoML também lê tudo antes de validar): assim contamos os bytes
+        # de verdade, mesmo sem Content-Length (upload chunked), e conferimos o campo "foto".
+        corpo = bytearray()
+        while True:
+            mensagem = await receive()
+            if mensagem["type"] != "http.request":
+                break  # cliente desconectou
+            corpo += mensagem.get("body", b"")
+            if not mensagem.get("more_body", False):
+                break
+        rastro["corpo_bytes"] = len(corpo)
+        entregue = False
+
+        async def receber():
+            nonlocal entregue
+            if not entregue:
+                entregue = True
+                return {"type": "http.request", "body": bytes(corpo), "more_body": False}
+            return await receive()
 
         async def enviar(mensagem):
             if mensagem["type"] == "http.response.start":
@@ -217,11 +274,16 @@ class RastroMiddleware:
             await send(mensagem)
 
         try:
-            await self.app(scope, receive, enviar)
+            recusa = await _conferir_multipart(scope, bytes(corpo), cabecalhos)
+            if recusa:
+                rastro["erro_tipo"] = "campo_foto_ausente"
+                await JSONResponse([{"error": recusa}], status_code=400)(scope, receber, enviar)
+            else:
+                await self.app(scope, receber, enviar)
         finally:
-            self._fechar(rastro, scope, cabecalhos, resposta, time.perf_counter() - inicio)
+            self._fechar(rastro, scope, resposta, time.perf_counter() - inicio)
 
-    def _fechar(self, rastro, scope, cabecalhos, resposta, duracao):
+    def _fechar(self, rastro, scope, resposta, duracao):
         http = resposta["status"]
         status = "ok" if http < 400 else "erro_cliente" if http < 500 else "erro_servidor"
         erro_msg = None
@@ -244,7 +306,8 @@ class RastroMiddleware:
             "erro_tipo": rastro["erro_tipo"] or (("validacao_upload" if http == 400 else "desconhecido") if http >= 400 else None),
             "erro_msg": erro_msg,
             "latencia_total_s": round(duracao, 4),
-            "corpo_bytes": int(cabecalhos.get("content-length") or 0),
+            "corpo_bytes": rastro["corpo_bytes"],
+            "carga_id": rastro["carga_id"],
             "entrada": rastro["entrada"],
             "saida": saida,
         }

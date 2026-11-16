@@ -5,6 +5,7 @@ o /metrics traz as métricas do BentoML e as nossas, e GET /monitor/* devolve as
 """
 
 import io
+import logging
 import os
 from typing import Annotated
 
@@ -12,7 +13,7 @@ import bentoml
 import ollama
 from bentoml.exceptions import InvalidArgument
 from PIL import Image
-from pydantic import WrapValidator
+from pydantic import ValidationError, WrapValidator
 from starlette.datastructures import UploadFile
 
 import extrator
@@ -45,10 +46,28 @@ def abrir_foto(valor, proximo):
         buffer = io.BytesIO()  # imagem já aberta (chamada direta em Python): gera os bytes
         valor.save(buffer, format=valor.format or "PNG")
         valor.bytes_enviados = buffer.getvalue()
+    elif not isinstance(valor, Image.Image):
+        # Ex.: JSON {"foto": "x"}: chegaria texto ao endpoint e daria 500. É erro de quem enviou.
+        raise InvalidArgument(MENSAGEM_NAO_IMAGEM)
     return proximo(valor)
 
 
 Foto = Annotated[Image.Image, WrapValidator(abrir_foto)]
+
+
+class SemTracebackDeErroDoCliente(logging.Filter):
+    """O BentoML escreve um traceback [ERROR] no terminal para todo 400 (foto inválida). É erro de quem
+    enviou e já fica no nosso log (evento "resposta"); aqui ele vira uma linha só, sem o traceback."""
+
+    def filter(self, registro: logging.LogRecord) -> bool:
+        erro = registro.exc_info[1] if registro.exc_info else None
+        if isinstance(erro, (InvalidArgument, ValidationError)):
+            registro.msg, registro.args = f"%s (erro do cliente, 400): {erro}", (registro.getMessage(),)
+            registro.levelno, registro.levelname, registro.exc_info, registro.exc_text = logging.INFO, "INFO", None, None
+        return True
+
+
+logging.getLogger("bentoml._internal.server.http_app").addFilter(SemTracebackDeErroDoCliente())
 
 # timeout: cada foto faz N_RESPOSTAS chamadas ao modelo. Em GPU são segundos; em CPU uma chamada
 # leva 194-286 s (medido), então sem GPU use N_RESPOSTAS=1 e, se preciso, TIMEOUT_SEGUNDOS=900.
@@ -92,6 +111,7 @@ class TriagemMedidor:
                     "evento": "pedido",
                     "versao_log": monitoramento.VERSAO_LOG,
                     "request_id": rastro.get("request_id"),
+                    "carga_id": rastro.get("carga_id"),
                     "endpoint": "/extrair",
                     "backend": extrator.BACKEND,
                     "modelo": MODELO_EM_USO,
