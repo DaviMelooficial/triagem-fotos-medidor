@@ -1,23 +1,26 @@
 # Cargas geradas com o serviço no modo simulado (BACKEND=simulado), porta 3300, 2026-11-16
-# As janelas de tempo abaixo são as usadas na análise KS/PSI (monitoring/analise/).
+# As cargas normal e drift foram refeitas em 2026-11-16 ~20:50 com carga_id (mesmas seeds, mesmas fotos); a análise filtra por ele.
 
-## perfil normal (início 2026-11-16T20:03:04-03:00)
-$ uv run python monitoring/gerar_carga.py --n 200 --perfil normal --url http://localhost:3300 --seed 7
-Enviando 200 pedidos para http://localhost:3300/extrair (perfil normal, seed 7, 2 em paralelo)
+## perfil normal (refeita com carga_id; é a usada em analise/normal_*)
+$ uv run python monitoring/gerar_carga.py --n 200 --perfil normal --url http://localhost:3340 --seed 7
+Enviando 200 pedidos para http://localhost:3340/extrair (perfil normal, seed 7, 2 em paralelo)
+carga_id = normal-7  (filtre com: just analise normal-7)
 status HTTP: {200: 169, 400: 31}
 tipos enviados: {'invalido_gif': 7, 'invalido_jpeg_cortado': 13, 'invalido_texto': 7, 'invalido_webp': 4, 'normal': 169}
-latência dos 200 (cliente): mediana 2.39 s, p95 2.95 s, máx 3.28 s
+latência dos 200 (cliente): mediana 2.32 s, p95 2.81 s, máx 3.78 s
 
-## perfil drift (início 2026-11-16T20:06:52-03:00, fim 2026-11-16T20:10:30-03:00)
-$ uv run python monitoring/gerar_carga.py --n 200 --perfil drift --url http://localhost:3300 --seed 8
-Enviando 200 pedidos para http://localhost:3300/extrair (perfil drift, seed 8, 2 em paralelo)
+## perfil drift (refeita com carga_id; é a usada em analise/drift_*)
+$ uv run python monitoring/gerar_carga.py --n 200 --perfil drift --url http://localhost:3340 --seed 8
+Enviando 200 pedidos para http://localhost:3340/extrair (perfil drift, seed 8, 2 em paralelo)
+carga_id = drift-8  (filtre com: just analise drift-8)
 status HTTP: {200: 173, 400: 27}
 tipos enviados: {'drift_borrada': 28, 'drift_escura': 23, 'drift_estourada': 30, 'drift_girada_90': 33, 'drift_pequena': 33, 'drift_preto_e_branco': 26, 'invalido_gif': 5, 'invalido_jpeg_cortado': 10, 'invalido_texto': 3, 'invalido_webp': 9}
-latência dos 200 (cliente): mediana 2.41 s, p95 3.13 s, máx 3.58 s
+latência dos 200 (cliente): mediana 2.25 s, p95 2.94 s, máx 3.26 s
 
 ## perfil misto, com Prometheus, DuckDB e fotos do /metrics antes/depois (início 2026-11-16T20:16:07-03:00, fim 2026-11-16T20:18:09-03:00)
 $ uv run python monitoring/gerar_carga.py --n 100 --url http://localhost:3300 --seed 12
 Enviando 100 pedidos para http://localhost:3300/extrair (perfil misto, seed 12, 2 em paralelo)
+  100/100 enviados (112 s)   (tempo total da carga)
 status HTTP: {200: 95, 400: 5}
 tipos enviados: {'drift_borrada': 5, 'drift_escura': 5, 'drift_estourada': 4, 'drift_girada_90': 4, 'drift_pequena': 3, 'drift_preto_e_branco': 9, 'invalido_gif': 1, 'invalido_jpeg_cortado': 2, 'invalido_webp': 2, 'normal': 65}
 latência dos 200 (cliente): mediana 2.34 s, p95 3.05 s, máx 3.33 s

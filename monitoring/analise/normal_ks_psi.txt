@@ -1,8 +1,10 @@
-Análise do log 'normal' (inferencia.jsonl e rotacionados), intervalo: 2026-11-16T20:03:04-03:00 a 2026-11-16T20:06:53-03:00
-eventos resposta: 200 {'ok': 169, 'erro_cliente': 31}; usados no KS/PSI (status ok): 169; referência: 200
-KS: com n_ref=200 e n_lote=169, só diferenças D >= 0.142 são detectáveis com alfa 0,05
+Análise do log (inferencia.jsonl e rotacionados), carga_id=normal-7, backend simulado
+eventos resposta: 200 {'ok': 169, 'erro_cliente': 31}; usados nos testes (status ok): 169; referência: 200
+25 testes (24 variáveis + KS por pixel); alfa 0,05; Bonferroni: p < 0,05/25 = 0.0020
+KS: com estes n, D precisa passar de 0.1419 para dar p < 0,05 e de 0.1942 com Bonferroni (valor crítico, não é o poder do teste)
 
-variável                        média ref  média log    KS D      KS p     PSI lim.ruído  drift?
+Contínuas (KS):
+variável                        média ref  média log    KS D         p     PSI lim.ruído  drift?
 entrada.megapixels                  1.263      1.252   0.083     0.525   0.167     0.185  -
 entrada.razao_aspecto              0.6562     0.6577   0.062     0.845   0.100     0.185  -
 entrada.bytes_por_pixel            0.1521     0.1534   0.068      0.76   0.126     0.185  -
@@ -10,19 +12,30 @@ entrada.media_l                     140.2      140.4   0.046     0.984   0.060  
 entrada.media_r                     143.1      143.3   0.058     0.897   0.046     0.185  -
 entrada.media_g                     140.8        141   0.060     0.865   0.049     0.185  -
 entrada.media_b                     129.8      130.1   0.079     0.588   0.082     0.185  -
-entrada.contraste_l                 48.57      47.64   0.149    0.0301   0.124     0.185  KS 
+entrada.contraste_l                 48.57      47.64   0.149    0.0301   0.124     0.185  teste 
 entrada.croma_medio                0.1028     0.1009   0.104     0.255   0.112     0.185  -
 entrada.nitidez_laplaciano          198.2      191.8   0.096     0.342   0.095     0.185  -
 entrada.frac_escuros                0.011     0.0096   0.082     0.537   0.102     0.185  -
 entrada.frac_estourados             0.041      0.039   0.100     0.299   0.106     0.185  -
 entrada.entropia_l                  3.503      3.478   0.087     0.458   0.056     0.185  -
-saida.confianca_geral              0.8861      0.914   0.086     0.479   0.036     0.065  -
-saida.precisa_revisao                0.34     0.2544   0.086     0.479   0.035     0.042  -
-saida.n_campos_nulos                    0          0   0.000         1   0.000     0.042  -
-saida.leitura_suspeita              0.005          0   0.005         1   0.004     0.042  -
 
+Discretas/categóricas (qui-quadrado; Fisher se esperado < 5):
+variável                                     teste         p     PSI lim.ruído  drift?  maiores mudanças (ref -> log)
+saida.confianca_geral            fisher_montecarlo     0.132   0.036     0.065  -       0.67: 34% -> 25% | 1: 66% -> 75% | 0.33: 0% -> 1%
+saida.confianca_numero_medidor                qui2     0.541   0.006     0.042  -       1: 88% -> 91% | 0.67: 12% -> 9%
+saida.confianca_funcao                        qui2      0.18   0.025     0.042  -       1: 88% -> 92% | 0.67: 12% -> 8%
+saida.confianca_leitura          fisher_montecarlo     0.722   0.009     0.065  -       0.67: 14% -> 11% | 1: 85% -> 88% | 0.33: 0% -> 1%
+saida.precisa_revisao                         qui2    0.0946   0.035     0.042  -       1: 34% -> 25% | 0: 66% -> 75%
+saida.n_campos_nulos             nenhum (uma categoria só)         1   0.000     0.042  -       0: 100% -> 100%
+saida.leitura_suspeita                      fisher         1   0.004     0.042  -       0: 100% -> 100% | 1: 0% -> 0%
+saida.respostas_identicas                     qui2    0.0946   0.035     0.042  -       1: 66% -> 75% | 0: 34% -> 25%
+saida.votos_distintos_leitura    fisher_montecarlo     0.724   0.009     0.065  -       2: 14% -> 11% | 1: 85% -> 88% | 3: 0% -> 1%
+saida.leitura_n_digitos          fisher_montecarlo     0.825   0.007     0.065  -       6: 48% -> 50% | 5: 52% -> 50% | 10: 0% -> 0%
+saida.funcao                                  qui2     0.805   0.017     0.104  -       kWh: 16% -> 21% | 03: 18% -> 17% | kvarh: 22% -> 20%
+
+precisa_revisao (KPI): 34.0% na referência -> 25.4% no log; diferença -8.6 pp, IC 95% [-17.8; +0.7] pp
 KS por pixel (histograma de L somado, como na aula 003): D=0.0095, p=1.0, drift=False
 
-Com drift no KS (p < 0,05): ['entrada.contraste_l']
-Com drift no KS corrigido por Bonferroni (p < 0,05/17 = 0.0029): nenhuma
-Com drift no PSI (> 0,25 e acima do ruído): nenhuma
+Com drift (p < 0,05): ['entrada.contraste_l']
+Com drift após Bonferroni (p < 0.0020): nenhuma
+Com drift no PSI (> 0,25 e acima do ruído; sem correção de multiplicidade): nenhuma

@@ -1,0 +1,24 @@
+# Tamanho das linhas do log, medido no logs/inferencia.jsonl desta máquina (2026-11-16T20:59:51-03:00)
+$ uv run python tamanho.py
+linhas no logs/inferencia.jsonl: 1984
+pedido                     n=  954  média   826.9 bytes  (mín 731, máx 851)
+resposta ok                n=  891  média  1395.3 bytes  (mín 1337, máx 1429)
+resposta 400 sem entrada   n=   76  média   476.6 bytes  (mín 464, máx 501)
+resposta 400 com entrada   n=   63  média  1022.1 bytes  (mín 929, máx 1043)
+pedido + resposta ok = 2222 bytes por pedido -> 4719 pedidos por arquivo de 10 MB, 28311 em 6 arquivos (atual + 5 backups)
+
+# script:
+import json, statistics
+linhas = open("logs/inferencia.jsonl", "rb").read().splitlines()
+grupos = {"pedido": [], "resposta ok": [], "resposta 400 sem entrada": [], "resposta 400 com entrada": []}
+for l in linhas:
+    e = json.loads(l); b = len(l) + 1
+    if e["evento"] == "pedido": grupos["pedido"].append(b)
+    elif e["status"] == "ok": grupos["resposta ok"].append(b)
+    elif e["entrada"] is None: grupos["resposta 400 sem entrada"].append(b)
+    else: grupos["resposta 400 com entrada"].append(b)
+print(f"linhas no logs/inferencia.jsonl: {len(linhas)}")
+for k, v in grupos.items():
+    if v: print(f"{k:26s} n={len(v):5d}  média {statistics.mean(v):7.1f} bytes  (mín {min(v)}, máx {max(v)})")
+par = statistics.mean(grupos["pedido"]) + statistics.mean(grupos["resposta ok"])
+print(f"pedido + resposta ok = {par:.0f} bytes por pedido -> {10*1024*1024/par:.0f} pedidos por arquivo de 10 MB, {6*10*1024*1024/par:.0f} em 6 arquivos (atual + 5 backups)")

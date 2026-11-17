@@ -1,0 +1,20 @@
+# Custo de abrir a foto e calcular as variáveis de entrada (monitoramento.variaveis_entrada), Mac M5, 2026-11-16
+$ uv run python custo.py
+exemplos/01_display_registro_103.jpg: 900x1600 (1.44 MP), abrir+variáveis em 30 repetições: mediana 49 ms, mín 49 ms, máx 98 ms
+exemplos/03_tampa_opaca.jpg: 1200x1600 (1.92 MP), abrir+variáveis em 30 repetições: mediana 98 ms, mín 70 ms, máx 139 ms
+
+# script usado:
+import io, sys, time, statistics
+sys.path.insert(0, ".")
+from PIL import Image
+import monitoramento
+for nome in ["exemplos/01_display_registro_103.jpg", "exemplos/03_tampa_opaca.jpg"]:
+    bruto = open(nome, "rb").read()
+    tempos = []
+    for _ in range(30):
+        t = time.perf_counter()
+        img = Image.open(io.BytesIO(bruto)); img.load()
+        monitoramento.variaveis_entrada(img, bruto)
+        tempos.append(time.perf_counter() - t)
+    print(f"{nome}: {img.size[0]}x{img.size[1]} ({img.size[0]*img.size[1]/1e6:.2f} MP), abrir+variáveis em 30 repetições: "
+          f"mediana {1000*statistics.median(tempos):.0f} ms, mín {1000*min(tempos):.0f} ms, máx {1000*max(tempos):.0f} ms")

@@ -1,0 +1,19 @@
+# Entradas inválidas que davam 500 e hoje dão 400 (serviço simulado na porta 3340, 2026-11-16T20:58:31-03:00)
+$ curl -s -X POST localhost:3340/extrair -H 'content-type: application/json' -d '{"foto":"x"}'
+[{"error":"O arquivo enviado não é uma imagem válida. Envie uma foto JPEG ou PNG."}]  -> HTTP 400
+$ curl -s -X POST localhost:3340/extrair -F arquivo=@exemplos/01_display_registro_103.jpg      # campo com outro nome
+[{"error":"Envie a foto como arquivo no campo multipart \"foto\" (ex.: curl -F \"foto=@foto.jpg\")."}]  -> HTTP 400
+$ curl -s -X POST localhost:3340/extrair -F 'foto=http://example.com/a.jpg'   # foto em texto
+[{"error":"Envie a foto como arquivo no campo multipart \"foto\" (ex.: curl -F \"foto=@foto.jpg\")."}]  -> HTTP 400
+$ curl -s -X POST localhost:3340/extrair -H 'Transfer-Encoding: chunked' -F foto=@exemplos/01_display_registro_103.jpg   # sem Content-Length
+  -> HTTP 200
+
+# As 4 linhas 'resposta' correspondentes no log (http_status, erro_tipo, corpo_bytes):
+400 validacao_upload 12 O arquivo enviado não é uma imagem válida. Envie uma foto JPEG ou PNG.
+400 campo_foto_ausente 129575 Envie a foto como arquivo no campo multipart "foto" (ex.: curl -F "foto=@foto.jp
+400 campo_foto_ausente 175 Envie a foto como arquivo no campo multipart "foto" (ex.: curl -F "foto=@foto.jp
+200 None 129572 
+
+# No terminal do serviço, um 400 vira uma linha (sem traceback); contagem de 'Traceback' no terminal desde que subiu:
+0
+2026-11-16T20:58:31-0300 [INFO] [entry_service:TriagemMedidor:1] Exception on /extrair [POST] (erro do cliente, 400): O arquivo enviado não é uma imagem válida. Envie uma foto JPEG ou PNG. (trace=6cc164999dceed44b59f5566caae99a0,s

@@ -1,28 +1,41 @@
-Análise do log 'drift' (inferencia.jsonl e rotacionados), intervalo: 2026-11-16T20:06:53-03:00 a 2026-11-16T20:10:31-03:00
-eventos resposta: 200 {'ok': 173, 'erro_cliente': 27}; usados no KS/PSI (status ok): 173; referência: 200
-KS: com n_ref=200 e n_lote=173, só diferenças D >= 0.141 são detectáveis com alfa 0,05
+Análise do log (inferencia.jsonl e rotacionados), carga_id=drift-8, backend simulado
+eventos resposta: 200 {'ok': 173, 'erro_cliente': 27}; usados nos testes (status ok): 173; referência: 200
+25 testes (24 variáveis + KS por pixel); alfa 0,05; Bonferroni: p < 0,05/25 = 0.0020
+KS: com estes n, D precisa passar de 0.141 para dar p < 0,05 e de 0.193 com Bonferroni (valor crítico, não é o poder do teste)
 
-variável                        média ref  média log    KS D      KS p     PSI lim.ruído  drift?
-entrada.megapixels                  1.263      1.398   0.599  1.51e-31   3.260     0.182  KS PSI
-entrada.razao_aspecto              0.6562     0.8497   0.450  1.75e-17   2.702     0.182  KS PSI
-entrada.bytes_por_pixel            0.1521     0.0886   0.589  1.76e-30   2.087     0.182  KS PSI
-entrada.media_l                     140.2        143   0.256  7.34e-06   1.598     0.182  KS PSI
-entrada.media_r                     143.1      145.1   0.202  0.000812   1.332     0.182  KS PSI
-entrada.media_g                     140.8      143.5   0.236  4.81e-05   1.226     0.182  KS PSI
-entrada.media_b                     129.8      135.2   0.252  1.13e-05   1.753     0.182  KS PSI
-entrada.contraste_l                 48.57      42.97   0.254  9.53e-06   0.994     0.182  KS PSI
-entrada.croma_medio                0.1028     0.0746   0.365  1.59e-11   1.360     0.182  KS PSI
-entrada.nitidez_laplaciano          198.2      202.3   0.301  5.88e-08   1.195     0.182  KS PSI
+Contínuas (KS):
+variável                        média ref  média log    KS D         p     PSI lim.ruído  drift?
+entrada.megapixels                  1.263      1.398   0.599  1.51e-31   3.260     0.182  teste+Bonf PSI
+entrada.razao_aspecto              0.6562     0.8497   0.450  1.75e-17   2.702     0.182  teste+Bonf PSI
+entrada.bytes_por_pixel            0.1521     0.0886   0.589  1.76e-30   2.087     0.182  teste+Bonf PSI
+entrada.media_l                     140.2        143   0.256  7.34e-06   1.598     0.182  teste+Bonf PSI
+entrada.media_r                     143.1      145.1   0.202  0.000812   1.332     0.182  teste+Bonf PSI
+entrada.media_g                     140.8      143.5   0.236  4.81e-05   1.226     0.182  teste+Bonf PSI
+entrada.media_b                     129.8      135.2   0.252  1.13e-05   1.753     0.182  teste+Bonf PSI
+entrada.contraste_l                 48.57      42.97   0.254  9.53e-06   0.994     0.182  teste+Bonf PSI
+entrada.croma_medio                0.1028     0.0746   0.365  1.59e-11   1.360     0.182  teste+Bonf PSI
+entrada.nitidez_laplaciano          198.2      202.3   0.301  5.88e-08   1.195     0.182  teste+Bonf PSI
 entrada.frac_escuros                0.011     0.0371   0.115     0.154   0.534     0.182  PSI
-entrada.frac_estourados             0.041     0.1453   0.239  3.67e-05   1.777     0.182  KS PSI
-entrada.entropia_l                  3.503      3.058   0.365  1.63e-11   1.674     0.182  KS PSI
-saida.confianca_geral              0.8861     0.7595   0.203  0.000766   0.728     0.065  KS PSI
-saida.precisa_revisao                0.34     0.5145   0.174   0.00597   0.124     0.041  KS 
-saida.n_campos_nulos                    0     0.0289   0.029         1   0.075     0.041  -
-saida.leitura_suspeita              0.005     0.0173   0.012         1   0.013     0.041  -
+entrada.frac_estourados             0.041     0.1453   0.239  3.67e-05   1.777     0.182  teste+Bonf PSI
+entrada.entropia_l                  3.503      3.058   0.365  1.63e-11   1.674     0.182  teste+Bonf PSI
 
+Discretas/categóricas (qui-quadrado; Fisher se esperado < 5):
+variável                                     teste         p     PSI lim.ruído  drift?  maiores mudanças (ref -> log)
+saida.confianca_geral                         qui2  3.27e-10   0.728     0.065  teste+Bonf PSI  0.33: 0% -> 21% | 1: 66% -> 49% | 0.67: 34% -> 31%
+saida.confianca_numero_medidor                qui2  9.03e-06   0.372     0.065  teste+Bonf PSI  1: 88% -> 72% | 0.33: 0% -> 9% | 0.67: 12% -> 19%
+saida.confianca_funcao           fisher_montecarlo     5e-05   0.248     0.065  teste+Bonf   1: 88% -> 72% | 0.67: 12% -> 23% | 0.33: 0% -> 5%
+saida.confianca_leitura                       qui2   1.7e-05   0.314     0.065  teste+Bonf PSI  1: 85% -> 71% | 0.33: 0% -> 11% | 0.67: 14% -> 18%
+saida.precisa_revisao                         qui2  0.000974   0.124     0.041  teste+Bonf   0: 66% -> 49% | 1: 34% -> 51%
+saida.n_campos_nulos                        fisher    0.0208   0.075     0.041  teste   0: 100% -> 97% | 1: 0% -> 3%
+saida.leitura_suspeita                      fisher     0.341   0.013     0.041  -       1: 0% -> 2% | 0: 100% -> 98%
+saida.respostas_identicas                     qui2  0.000974   0.124     0.041  teste+Bonf   1: 66% -> 49% | 0: 34% -> 51%
+saida.votos_distintos_leitura                 qui2   1.7e-05   0.314     0.065  teste+Bonf PSI  1: 85% -> 71% | 3: 0% -> 11% | 2: 14% -> 18%
+saida.leitura_n_digitos          fisher_montecarlo     0.608   0.021     0.102  -       6: 48% -> 45% | 10: 0% -> 1% | 5: 52% -> 53%
+saida.funcao                     fisher_montecarlo     0.493   0.046     0.119  -       kWh: 16% -> 21% | 03: 18% -> 14% | 103: 20% -> 17%
+
+precisa_revisao (KPI): 34.0% na referência -> 51.4% no log; diferença +17.4 pp, IC 95% [+7.5; +27.4] pp
 KS por pixel (histograma de L somado, como na aula 003): D=0.1043, p=0.2509, drift=False
 
-Com drift no KS (p < 0,05): ['entrada.megapixels', 'entrada.razao_aspecto', 'entrada.bytes_por_pixel', 'entrada.media_l', 'entrada.media_r', 'entrada.media_g', 'entrada.media_b', 'entrada.contraste_l', 'entrada.croma_medio', 'entrada.nitidez_laplaciano', 'entrada.frac_estourados', 'entrada.entropia_l', 'saida.confianca_geral', 'saida.precisa_revisao']
-Com drift no KS corrigido por Bonferroni (p < 0,05/17 = 0.0029): ['entrada.megapixels', 'entrada.razao_aspecto', 'entrada.bytes_por_pixel', 'entrada.media_l', 'entrada.media_r', 'entrada.media_g', 'entrada.media_b', 'entrada.contraste_l', 'entrada.croma_medio', 'entrada.nitidez_laplaciano', 'entrada.frac_estourados', 'entrada.entropia_l', 'saida.confianca_geral']
-Com drift no PSI (> 0,25 e acima do ruído): ['entrada.megapixels', 'entrada.razao_aspecto', 'entrada.bytes_por_pixel', 'entrada.media_l', 'entrada.media_r', 'entrada.media_g', 'entrada.media_b', 'entrada.contraste_l', 'entrada.croma_medio', 'entrada.nitidez_laplaciano', 'entrada.frac_escuros', 'entrada.frac_estourados', 'entrada.entropia_l', 'saida.confianca_geral']
+Com drift (p < 0,05): ['entrada.megapixels', 'entrada.razao_aspecto', 'entrada.bytes_por_pixel', 'entrada.media_l', 'entrada.media_r', 'entrada.media_g', 'entrada.media_b', 'entrada.contraste_l', 'entrada.croma_medio', 'entrada.nitidez_laplaciano', 'entrada.frac_estourados', 'entrada.entropia_l', 'saida.confianca_geral', 'saida.confianca_numero_medidor', 'saida.confianca_funcao', 'saida.confianca_leitura', 'saida.precisa_revisao', 'saida.n_campos_nulos', 'saida.respostas_identicas', 'saida.votos_distintos_leitura']
+Com drift após Bonferroni (p < 0.0020): ['entrada.megapixels', 'entrada.razao_aspecto', 'entrada.bytes_por_pixel', 'entrada.media_l', 'entrada.media_r', 'entrada.media_g', 'entrada.media_b', 'entrada.contraste_l', 'entrada.croma_medio', 'entrada.nitidez_laplaciano', 'entrada.frac_estourados', 'entrada.entropia_l', 'saida.confianca_geral', 'saida.confianca_numero_medidor', 'saida.confianca_funcao', 'saida.confianca_leitura', 'saida.precisa_revisao', 'saida.respostas_identicas', 'saida.votos_distintos_leitura']
+Com drift no PSI (> 0,25 e acima do ruído; sem correção de multiplicidade): ['entrada.megapixels', 'entrada.razao_aspecto', 'entrada.bytes_por_pixel', 'entrada.media_l', 'entrada.media_r', 'entrada.media_g', 'entrada.media_b', 'entrada.contraste_l', 'entrada.croma_medio', 'entrada.nitidez_laplaciano', 'entrada.frac_escuros', 'entrada.frac_estourados', 'entrada.entropia_l', 'saida.confianca_geral', 'saida.confianca_numero_medidor', 'saida.confianca_leitura', 'saida.votos_distintos_leitura']

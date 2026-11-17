@@ -12,7 +12,8 @@ O que foi acrescentado, em uma frase cada:
 - **`GET /monitor/*`**: devolve as variáveis do log prontas para histograma, boxplot, KS e PSI (JSON ou CSV).
 - **Pilha Docker** ([`docker-compose.yml`](docker-compose.yml)): Prometheus (coleta e guarda o `/metrics`), Loki + Promtail
   (recebem o log) e Grafana. **DuckDB**: script que copia o `/metrics` e o log para um banco relacional.
-- **Análise KS/PSI** contra um conjunto de referência montado à mão, com resultado real mais abaixo.
+- **Análise de drift** (KS nas variáveis contínuas, qui-quadrado/Fisher nas discretas, PSI em todas) contra um conjunto de
+  referência montado à mão, com resultado real mais abaixo.
 - **Modo simulado** (`BACKEND=simulado`): o mesmo serviço, sem precisar do Ollama, para gerar carga em máquina sem GPU.
 
 ## Mapa: item do enunciado → onde está
@@ -33,6 +34,19 @@ O que foi acrescentado, em uma frase cada:
 
 Precisa de: [uv](https://docs.astral.sh/uv/) (instala o Python 3.12 sozinho). `just` é opcional. Docker só para os extras.
 **Não precisa de Ollama nem de GPU**: o roteiro usa o modo simulado (explicado [abaixo](#modo-simulado-e-modo-real)).
+Este monitoramento está na branch `feat/monitoramento`; depois do merge, na `main`. Antes do merge, troque
+o `git clone` abaixo por `git clone -b feat/monitoramento ...`.
+
+**Porta.** Tudo usa a porta 3000. Se ela estiver ocupada, escolha outra **uma vez por terminal** com a variável
+`PORTA_API`, e todas as receitas (`serve-simulado`, `carga`, `metricas`, `rastro-resumo`, `metrics-foto`, `duckdb`, `pilha`)
+e o `docker compose` passam a usá-la:
+
+| | Mac / Linux / Git Bash | Windows PowerShell |
+|---|---|---|
+| escolher a porta | `export PORTA_API=3001` | `$env:PORTA_API=3001` |
+
+Sem a variável e com a porta escrita no comando, só `serve`, `serve-simulado` e `demo` aceitam a porta como argumento
+(`just serve-simulado 3001`); nas outras receitas os argumentos são outra coisa (ex.: `just duckdb 30` = 30 coletas).
 
 **Terminal 1 — sobe o serviço:**
 
@@ -40,23 +54,26 @@ Precisa de: [uv](https://docs.astral.sh/uv/) (instala o Python 3.12 sozinho). `j
 git clone https://github.com/DaviMelooficial/triagem-fotos-medidor.git
 cd triagem-fotos-medidor
 uv sync                       # instala as versões travadas (inclui as bibliotecas de análise)
-just serve-simulado           # ou, sem just (Mac/Linux): BACKEND=simulado uv run bentoml serve service:TriagemMedidor
+just serve-simulado           # ou, sem just: BACKEND=simulado uv run bentoml serve service:TriagemMedidor --port ${PORTA_API:-3000}
 ```
-
-Windows (PowerShell), sem just:
-
-```powershell
-$env:BACKEND="simulado"; uv run bentoml serve service:TriagemMedidor
-```
-
-Porta 3000 ocupada? `just serve-simulado 3001` (sem just: acrescente `--port 3001`) e use a mesma porta nos comandos abaixo
-(`just carga 100 misto 3001`, `--url http://localhost:3001`).
 
 **Terminal 2 — gera carga e olha o rastro:**
 
 ```bash
-just carga 100                # ou: uv run python monitoring/gerar_carga.py --n 100
-just rastro                   # ou: tail -f logs/inferencia.jsonl   (PowerShell: Get-Content logs\inferencia.jsonl -Wait -Tail 5)
+just carga 100                # ou: uv run python monitoring/gerar_carga.py --n 100 --url http://localhost:${PORTA_API:-3000}
+just rastro                   # ou: tail -f logs/inferencia.jsonl
+```
+
+**Windows (PowerShell), sem just** (as receitas `just` rodam em `sh`: no Windows só funcionam com o Git for Windows/Git Bash instalado):
+
+```powershell
+$env:PORTA_API=3000                                   # ou outra porta livre
+$env:BACKEND="simulado"; uv run bentoml serve service:TriagemMedidor --port $env:PORTA_API     # terminal 1
+uv run python monitoring/gerar_carga.py --n 100 --url "http://localhost:$env:PORTA_API"         # terminal 2
+Get-Content logs\inferencia.jsonl -Wait -Tail 5                                                  # o rastro
+curl.exe -s "http://localhost:$env:PORTA_API/monitor/resumo"
+uv run python monitoring/analise.py
+docker compose -f monitoring/docker-compose.yml up -d                                           # lê $env:PORTA_API
 ```
 
 Com o `just rastro` aberto, rode `just carga 20` num terceiro terminal e veja as linhas chegando, duas por pedido
@@ -73,20 +90,25 @@ status HTTP: {200: 16, 400: 4}
 tipos enviados: {'drift_borrada': 1, 'drift_escura': 1, 'drift_estourada': 3, 'drift_girada_90': 1, 'drift_pequena': 1, 'invalido_gif': 1, 'invalido_webp': 3, 'normal': 9}
 ```
 
-**Depois da carga** (com o serviço ainda rodando):
+Cada carga imprime um `carga_id` (ex.: `misto-483920`), que vai para o log em cada pedido e serve de filtro na análise.
+
+**Depois da carga** (com o serviço ainda rodando; `P=${PORTA_API:-3000}`):
 
 ```bash
-just metricas                 # linhas do /metrics do /extrair e as nossas; ou: curl -s localhost:3000/metrics
-curl -s "localhost:3000/monitor/resumo" | head -c 600       # contagens e quantis por variável
-curl -s "localhost:3000/monitor/variaveis?formato=csv" > variaveis.csv   # tudo achatado, para planilha/pandas
-just analise                  # KS, PSI, histogramas e boxplots contra a referência (monitoring/analise/)
+just metricas                 # linhas do /metrics do /extrair e as nossas; ou: curl -s localhost:$P/metrics
+just rastro-resumo            # contagem por status; ou: curl -s "localhost:$P/monitor/resumo"
+curl -s "localhost:$P/monitor/variaveis?formato=csv" > variaveis.csv     # tudo achatado, para planilha/pandas
+just analise misto-483920     # testes de drift, PSI, histogramas e boxplots dessa carga -> monitoring/saida/
+just analise                  # o mesmo para o log inteiro
 ```
+
+A análise e a planilha refeitas por quem segue o roteiro vão para `monitoring/saida/` (fora do git), sem sobrescrever os
+resultados desta entrega (`monitoring/analise/` e `monitoring/analise_metrics.xlsx`).
 
 **Extras (Docker):**
 
 ```bash
-just pilha                    # ou: docker compose -f monitoring/docker-compose.yml up -d
-                              #     (se o serviço não estiver na 3000: PORTA_API=3001 docker compose ... up -d)
+just pilha                    # ou: docker compose -f monitoring/docker-compose.yml up -d   (usa PORTA_API)
 just carga 100
 # Prometheus: http://localhost:9090  (Status > Targets: triagem-medidor UP)
 # Loki pela API: curl -s -G localhost:3100/loki/api/v1/query --data-urlencode 'query=sum by (evento,status) (count_over_time({job="triagem-medidor"}[1h]))'
@@ -97,7 +119,8 @@ just duckdb-consultas         # consultas SQL de exemplo
 just pilha-parar              # derruba os containers (dados ficam nos volumes)
 ```
 
-`just` lista todas as receitas. Para parar o serviço: Ctrl+C no terminal 1.
+`just` lista todas as receitas. Para parar o serviço: Ctrl+C no terminal 1. No terminal do serviço, um 400 aparece numa
+linha só (`Exception on /extrair [POST] (erro do cliente, 400): ...`), sem traceback: o detalhe fica no nosso log.
 
 ## Modo simulado e modo real
 
@@ -120,7 +143,8 @@ por foto, acima do timeout de 300 s; gerar 100 pedidos levaria um dia. Por isso 
   caminho (abre e valida a foto, calcula as variáveis de entrada, vota, grava o log e as métricas) e só troca a chamada
   ao Ollama por [`simulado.py`](../simulado.py): uma resposta determinística derivada do sha256 da foto, com chance de erro
   que cresce quando a foto é escura, estourada, sem contraste ou borrada (como o modelo real), e latência sorteada de uma
-  log-normal com mediana 0,3 s por chamada (`SIMULADO_LATENCIA_S` muda). Não sobe o Ollama nem precisa dele.
+  log-normal com mediana 0,3 × (1 + 0,1 × megapixels) s por chamada (≈0,34 s numa foto de 1,44 MP; `SIMULADO_LATENCIA_S`
+  troca o 0,3). Não sobe o Ollama nem precisa dele.
   **Os números lidos são inventados**; a resposta HTTP traz `"backend": "simulado"` e **toda linha do log traz
   `backend` e `modelo`**, então nunca se confunde rastro simulado com real (o filtro `?backend=ollama` do `/monitor` separa).
 
@@ -238,7 +262,8 @@ O = operação. "Drift que detecta" diz o que uma mudança na distribuição daq
 | `http_status`, `status` | inteiro, `ok`/`erro_cliente`/`erro_servidor` | | O | taxa de erro; 4xx = cliente mandando lixo, 5xx = falha nossa |
 | `erro_tipo`, `erro_msg` | texto | | O | por que falhou (`validacao_upload`, `InvalidArgument`, `ValidationError`...) |
 | `latencia_total_s` | número | s | O | tempo do pedido inteiro, incluindo fila; histograma/boxplot de latência |
-| `corpo_bytes` | inteiro | bytes | E | tamanho do upload (existe até nos 400) |
+| `corpo_bytes` | inteiro | bytes | E | tamanho do corpo HTTP recebido, contado pelo middleware (vale também em upload chunked, sem `Content-Length`; existe até nos 400) |
+| `carga_id` | texto ou `null` | | O | rótulo do cabeçalho `X-Carga-Id` (o gerador de carga manda); filtra uma carga sem depender de horário |
 | `entrada.sha256` | texto | | E | foto repetida (reenvio do app, teste) sem guardar a foto |
 | `entrada.bytes` | inteiro | bytes | E | arquivo do app mudou de compressão |
 | `entrada.formato`, `entrada.modo_cor` | texto | | E | app passou a mandar PNG, HEIC, P&B |
@@ -265,15 +290,16 @@ O = operação. "Drift que detecta" diz o que uma mudança na distribuição daq
 | `saida.latencia_modelo_s`, `_chamada_media_s`, `_chamada_max_s`, `latencias_chamadas_s` | número | s | O | tempo do modelo, sem fila; CPU x GPU |
 
 Variáveis de cor e nitidez são calculadas numa cópia com no máximo 1024 px no lado maior, para fotos de tamanhos diferentes serem comparáveis.
-Custo medido: ~0,1 s por foto de 1,4 MP (validação + variáveis).
+Custo medido de abrir a foto e calcular as variáveis: mediana de 49 ms numa foto de 1,44 MP e de 66 a 98 ms numa de
+1,92 MP (30 repetições; [`evidencias/custo_variaveis.txt`](evidencias/custo_variaveis.txt)).
 
 ## Rotação e append-only
 
 - O arquivo é aberto em modo `"a"` (só acrescenta) por um `logging.handlers.RotatingFileHandler`. Quando passa de
   **10 MB** (`LOG_MAX_BYTES`), ele é renomeado para `inferencia.jsonl.1` (o `.1` vira `.2`, e assim até `.5`) e um arquivo novo
   começa. Ficam **5 backups** (`LOG_BACKUPS`): no máximo ~60 MB.
-- Medido no log desta entrega: `pedido` ≈ 0,8 KB, `resposta` ≈ 1,4 KB, ~2,2 KB por pedido → **~4.750 pedidos por arquivo,
-  ~28 mil no total**. Em volume de campo (dezenas de milhares de fotos por dia) isso cobre menos de um dia: em produção o arquivo
+- Medido no log desta entrega ([`evidencias/tamanho_log.txt`](evidencias/tamanho_log.txt)): `pedido` ≈ 0,8 KB, `resposta` ≈ 1,4 KB,
+  ~2,2 KB por pedido → **~4.700 pedidos por arquivo, ~28 mil no total**. Em volume de campo (dezenas de milhares de fotos por dia) isso cobre menos de um dia: em produção o arquivo
   é a fonte, e o histórico longo fica no Loki (abaixo) ou em armazenamento próprio.
 - Logger dedicado (`triagem.rastro`) que **não propaga** para o log do BentoML no terminal.
 - **1 processo** (`workers=1` no `@bentoml.service`): o `RotatingFileHandler` não é seguro com vários processos escrevendo no mesmo arquivo.
@@ -287,24 +313,40 @@ de `exemplos/` com 50 variações **leves** cada (brilho e contraste ±10 %, gir
 seed fixa: 200 amostras de "foto de campo aceitável". As variáveis de entrada são calculadas pela mesma função do serviço;
 as de saída vêm do backend simulado. Só números são salvos.
 
-**Experimento**: duas cargas de 200 pedidos ([`evidencias/carga.txt`](evidencias/carga.txt)): `normal` (mesmas variações
-leves da referência: não devia acusar nada) e `drift` (fotos escuras, estouradas, borradas, P&B, pequenas 360×480 e giradas 90°:
-devia acusar). Nos dois, 10 % de arquivos inválidos (que dão 400 e não entram no KS/PSI). Rodado com
-`just analise normal --inicio ... --fim ...` (janela de tempo de cada carga):
+**Teste certo para cada tipo de variável** ([`drift.py`](../drift.py)):
 
-| variável | carga normal: KS D (p) | PSI | carga drift: KS D (p) | PSI |
-|---|---|---|---|---|
-| megapixels | 0,083 (0,53) | 0,17 | **0,599 (1,5e-31)** | **3,26** |
-| razão de aspecto | 0,062 (0,85) | 0,10 | **0,450 (1,8e-17)** | **2,70** |
-| luminância média | 0,046 (0,98) | 0,06 | **0,256 (7,3e-06)** | **1,60** |
-| contraste | 0,149 (**0,030**) | 0,12 | **0,254 (9,5e-06)** | **0,99** |
-| nitidez (Laplaciano) | 0,096 (0,34) | 0,10 | **0,301 (5,9e-08)** | **1,20** |
-| fração estourada | 0,100 (0,30) | 0,11 | **0,239 (3,7e-05)** | **1,78** |
-| entropia | 0,087 (0,46) | 0,06 | **0,365 (1,6e-11)** | **1,67** |
-| confiança geral (saída) | 0,086 (0,48) | 0,04 | **0,203 (7,7e-04)** | **0,73** |
-| precisa_revisao (saída) | 0,086 (0,48) | 0,04 | **0,174 (6,0e-03)** | 0,12 |
+- as 13 variáveis **contínuas** da foto: **KS** de duas amostras;
+- as 11 **discretas ou categóricas** da saída (confiança 0,33/0,67/1,0, `precisa_revisao`, nulos, função lida, nº de dígitos...):
+  **qui-quadrado de homogeneidade** na tabela referência × lote, **Fisher** quando alguma contagem esperada é < 5. O KS em variável
+  com 2 ou 3 valores é conservador demais (cheio de empates): na primeira versão ele dava p = 0,006 para `precisa_revisao` subir de
+  34 % para 51 %, o que não passa na correção de Bonferroni; o qui-quadrado dá p = 0,00097;
+- em todas, **PSI** (decis da referência nas contínuas, as próprias categorias nas discretas);
+- **25 testes** ao todo (24 variáveis + o KS por pixel da aula 003): a correção de Bonferroni exige p < 0,05/25 = 0,002;
+- para o KPI `precisa_revisao`, também a **diferença em pontos percentuais com IC 95 %**.
 
-Tabelas completas (17 variáveis) em [`analise/normal_ks_psi.txt`](analise/normal_ks_psi.txt) e
+**Experimento**: duas cargas de 200 pedidos, cada uma marcada com um `carga_id` que entra no log
+([`evidencias/carga.txt`](evidencias/carga.txt)): `normal-7` (mesmas variações leves da referência: não devia acusar nada) e
+`drift-8` (fotos escuras, estouradas, borradas, P&B, pequenas 360×480 e giradas 90°: devia acusar). Nos dois, 10 % de arquivos
+inválidos (dão 400 e não entram nos testes). Rodado com
+`uv run python monitoring/analise.py normal-7 --rotulo normal --saida monitoring/analise` (idem `drift-8`); o mesmo resultado sai
+de `GET /monitor/drift?carga_id=drift-8` ([`evidencias/monitor_endpoints.txt`](evidencias/monitor_endpoints.txt)).
+
+| variável | teste | carga normal: estatística (p) | PSI | carga drift: estatística (p) | PSI |
+|---|---|---|---|---|---|
+| megapixels | KS | 0,083 (0,53) | 0,17 | **0,599 (1,5e-31)** | **3,26** |
+| razão de aspecto | KS | 0,062 (0,85) | 0,10 | **0,450 (1,8e-17)** | **2,70** |
+| luminância média | KS | 0,046 (0,98) | 0,06 | **0,256 (7,3e-06)** | **1,60** |
+| contraste | KS | 0,149 (0,030) | 0,12 | **0,254 (9,5e-06)** | **0,99** |
+| nitidez (Laplaciano) | KS | 0,096 (0,34) | 0,10 | **0,301 (5,9e-08)** | **1,20** |
+| fração estourada | KS | 0,100 (0,30) | 0,11 | **0,239 (3,7e-05)** | **1,78** |
+| entropia | KS | 0,087 (0,46) | 0,06 | **0,365 (1,6e-11)** | **1,67** |
+| confiança geral (saída) | qui²/Fisher | Fisher (0,13) | 0,04 | **qui² (3,3e-10)** | **0,73** |
+| `precisa_revisao` (saída) | qui² | qui² (0,095) | 0,04 | **qui² (9,7e-04)** | 0,12 |
+| função lida (saída) | qui²/Fisher | qui² (0,81) | 0,02 | Fisher (0,49) | 0,05 |
+
+Em negrito, o que passa na correção de Bonferroni (p < 0,002) ou no critério do PSI. `precisa_revisao`: **34,0 % → 25,4 %**
+na carga normal (−8,6 pp, IC 95 % [−17,8; +0,7]: o intervalo contém 0, não é mudança) e **34,0 % → 51,4 %** na carga drift
+(**+17,4 pp, IC 95 % [+7,5; +27,4]**). Tabelas completas (24 variáveis) em [`analise/normal_ks_psi.txt`](analise/normal_ks_psi.txt) e
 [`analise/drift_ks_psi.txt`](analise/drift_ks_psi.txt); gráficos:
 [histogramas normal](analise/normal_histogramas.svg), [histogramas drift](analise/drift_histogramas.svg),
 [boxplots normal](analise/normal_boxplots.svg), [boxplots drift](analise/drift_boxplots.svg),
@@ -314,21 +356,35 @@ Tabelas completas (17 variáveis) em [`analise/normal_ks_psi.txt`](analise/norma
 
 O que isso mostra:
 
-- **Os dados bastam para separar os dois casos.** Na carga drift, 13 variáveis acusam no KS mesmo com a correção de Bonferroni
-  (p < 0,05/17) e 14 no PSI; na carga normal, nenhuma depois da correção. A fração para revisão subiu de 34 % para 51 %:
-  o drift de entrada virou custo de operação.
+- **Os dados bastam para separar os dois casos.** Na carga drift, 19 das 24 variáveis acusam depois de Bonferroni (12 das 13 de
+  entrada e 7 das 11 de saída) e 17 no PSI; na carga normal, nenhuma depois da correção e nenhuma no PSI. A fração para revisão
+  subiu 17 pontos: o drift de entrada virou custo de operação. A função lida não mudou (o simulador sorteia a função pelo
+  sha256 da foto, independente da qualidade), e é isso que o teste diz.
 - **Média parecida não quer dizer distribuição parecida.** Na carga drift a luminância média foi de 140 para 143 e a nitidez
-  de 198 para 202, porque fotos escuras e estouradas (e borradas e pequenas) se compensam. O KS e o PSI olham a forma da
-  distribuição e acusam. Um alerta só na média não pegaria.
-- **Um falso alarme era esperado.** Na carga normal o contraste deu p = 0,030. Com 17 testes a 5 %, espera-se ~0,85 alarme
-  falso por rodada; com Bonferroni (p < 0,0029) some. Por isso o `/monitor/drift` devolve as duas listas.
-- **Quantas amostras precisa.** Com 200 de referência e ~170 no lote, o KS só enxerga diferenças D ≥ 0,14 (impresso no topo da
-  análise). O PSI tem um piso de ruído: **sem drift nenhum** ele vale em média (faixas − 1) × (1/n_ref + 1/n_lote). Com 10 faixas e
-  60 × 55 amostras isso dá ~0,31, acima do limiar usual de 0,25: com amostra pequena o PSI acusa drift que não existe (aconteceu
-  nos nossos primeiros testes). Por isso aumentamos a referência para 200, o código calcula o limite de ruído (95 %, aproximação
+  de 198 para 202, porque fotos escuras e estouradas (e borradas e pequenas) se compensam. Os testes olham a forma da
+  distribuição e acusam. Um alerta só na média não pegaria. O KS por pixel (histograma de L somado) também não pegou (p = 0,25).
+- **Alarme falso tem taxa medida.** Na carga normal o contraste deu p = 0,030: com 25 testes a 5 %, alarme falso é o esperado.
+  Medimos sem drift nenhum ([`alarme_falso.py`](alarme_falso.py), 1.000 rodadas sorteando referência e lote do mesmo conjunto,
+  [`evidencias/alarme_falso.txt`](evidencias/alarme_falso.txt)): **44 % das rodadas têm ao menos um p < 0,05; 2,5 % depois de
+  Bonferroni; 6,3 % com ao menos um PSI acusando**. O PSI **não tem correção de multiplicidade** (o limite de ruído é de 95 % por
+  variável), então ~6 % das janelas sem drift terão um alarme de PSI em alguma variável; por isso o contrato abaixo pede
+  3 variáveis e Bonferroni, não um PSI isolado.
+- **Quantas amostras precisa.** Com 200 de referência e ~170 no lote, o KS só dá p < 0,05 se a distância D passar de **0,14**, e
+  passa no Bonferroni só acima de **0,19** (valores críticos impressos no topo da análise; não são o poder do teste, que depende do
+  tamanho da mudança). O PSI tem um piso de ruído: **sem drift nenhum** ele vale em média (faixas − 1) × (1/n_ref + 1/n_lote). Com 10
+  faixas e 60 × 55 amostras isso dá ~0,31, acima do limiar usual de 0,25: com amostra pequena o PSI acusa drift que não existe
+  (aconteceu nos nossos primeiros testes). Por isso a referência tem 200, o código calcula o limite de ruído (95 %, aproximação
   qui-quadrado) e só marca `psi_drift` quando o PSI passa de 0,25 **e** desse limite. Regra prática: lote ≥ 150–200 fotos por janela.
-- **Limite honesto**: no modo simulado a saída é inventada, então o drift de saída aqui só prova que o pipeline de coleta e
-  comparação funciona. Em produção a referência de saída deve vir de um lote real já revisado por pessoas.
+- **Limites desta referência** (honestos):
+  - a saída é do modo simulado, inventada: o drift de saída aqui prova que a coleta e a comparação funcionam, não diz nada do
+    modelo real. Por isso o `/monitor/drift` compara só respostas do mesmo backend da referência;
+  - as 200 amostras **não são independentes**: são 4 fotos × 50 variações. O tamanho efetivo é menor que 200, os p-valores ficam
+    otimistas, e "a carga normal não acusa" é quase por construção (ela usa as mesmas 4 fotos e as mesmas variações);
+  - as fotos da equipe têm 900×1600 e 1200×1600; as de campo citadas no README principal têm 360×480. Contra esta referência,
+    fotos de campo reais **sempre** acusariam drift em megapixels, razão de aspecto e bytes por pixel;
+  - **em produção** a referência deve ser uma amostra real e grande (centenas a milhares de fotos de campo) do período em que o
+    modelo foi avaliado e aceito, com a saída do modelo real e, idealmente, já revisada por pessoas. `just referencia` mostra
+    como gerar o arquivo; trocar a fonte das fotos é trocar `variacoes.fotos_base()`.
 
 ## GET /metrics
 
@@ -364,11 +420,16 @@ porque um pedido em CPU passa disso (os nomes das métricas não mudam).
 
 [`analise_metrics.xlsx`](analise_metrics.xlsx) foi gerada com [`planilha_metrics.py`](planilha_metrics.py) a partir de duas
 fotos reais do `/metrics`, uma **antes** e outra **depois** de uma carga de 100 pedidos
-([`metrics_antes.txt`](evidencias/metrics_antes.txt), [`metrics_depois.txt`](evidencias/metrics_depois.txt)). As células
-amarelas são **fórmulas**: cole outra foto nas colunas ANTES/DEPOIS e tudo se recalcula. Para refazer com os seus números:
+([`metrics_antes.txt`](evidencias/metrics_antes.txt), [`metrics_depois.txt`](evidencias/metrics_depois.txt)), com o comando
+`uv run python monitoring/planilha_metrics.py --antes ... --depois ... --saida monitoring/analise_metrics.xlsx --recalcular`.
+As células amarelas são **fórmulas**: cole outra foto nas colunas ANTES/DEPOIS (contagens dos buckets, `_sum` da latência,
+`request_total`) e tudo se recalcula. A aba `erros` tem linhas fixas para 200, 400 e 500 do `/extrair`; para um código novo, insira
+uma linha dentro da tabela. O arquivo versionado já traz os valores calculados (gravados com o LibreOffice pelo `--recalcular`);
+uma planilha refeita sem LibreOffice é calculada ao abrir no Excel, LibreOffice ou Google Planilhas. Para refazer com os seus
+números (vai para `monitoring/saida/analise_metrics.xlsx`, sem tocar na da entrega):
 
 ```bash
-just metrics-foto antes.txt      # ou: uv run python monitoring/planilha_metrics.py --foto antes.txt
+just metrics-foto antes.txt      # ou: uv run python monitoring/planilha_metrics.py --foto antes.txt --url http://localhost:3000
 just carga 50
 just metrics-foto depois.txt
 just planilha antes.txt depois.txt   # ou: uv run python monitoring/planilha_metrics.py --antes antes.txt --depois depois.txt
@@ -386,9 +447,11 @@ O passo a passo do que a planilha calcula:
    É a mesma conta do `histogram_quantile` do Prometheus (conferimos: mesmos valores calculados em Python). Resultado: Q1 = 1,48 s,
    mediana = 2,05 s, Q3 = 2,92 s, p95 = 4,58 s; mínimo e máximo só se sabem até a faixa (0 e 5 s). Com esses cinco números a
    planilha desenha o boxplot (barras empilhadas com a base invisível).
-   **É estimativa**: a mediana real, tirada do log, foi 2,30 s e o p95 real 3,00 s. O erro pode chegar à largura da faixa
+   **É estimativa**: a mediana real, tirada do log na mesma janela (n = 100), foi 2,30 s e o p95 real 2,99 s
+   ([`evidencias/quantis_reais_log.txt`](evidencias/quantis_reais_log.txt)). O erro pode chegar à largura da faixa
    (2,5–5 s). Para latência exata, o log (`latencia_total_s`) ou o `/monitor/resumo`.
-4. **Média.** `_sum / _count` = 223,5 s / 100 = 2,24 s.
+4. **Média.** `_sum / _count` = 223,54 s / 100 = 2,24 s (o `_sum` está em [`metrics_depois.txt`](evidencias/metrics_depois.txt);
+   na foto ANTES o serviço ainda não tinha pedido ao `/extrair`, então vale 0).
 5. **Taxa de erro.** Aba `erros`: soma dos `request_total` do `/extrair` com código ≥ 400 ÷ total do `/extrair` na janela =
    5 / 100 = **5 %** (todos 4xx, culpa de quem enviou; 5xx = 0). Separar 4xx de 5xx importa: 4xx alto é o app mandando arquivo
    ruim; 5xx alto é o nosso serviço.
@@ -412,7 +475,7 @@ Essas contas já ficam gravadas como séries pelas regras em [`prometheus/regras
 | Prometheus (extras c/d) | uma amostra de cada série a cada **5 s**, no TSDB (volume Docker `prometheus-dados`) | **15 dias ou 1 GB**, o que vier primeiro (`--storage.tsdb.retention.time=15d`, `--storage.tsdb.retention.size=1GB`; padrão do Prometheus: 15 d sem limite de tamanho). Sobrevive a reiniciar o container. |
 | `logs/inferencia.jsonl` | cada pedido, com todas as variáveis | até **10 MB × (1 + 5 backups) ≈ 60 MB ≈ 28 mil pedidos**; o mais velho é apagado na rotação |
 | Loki (extra a) | as linhas do log | **7 dias** (`retention_period: 168h`, compactor ligado), volume `loki-dados` |
-| DuckDB (extra e) | cada coleta do `/metrics` + o log | **sem limite**: arquivo `monitoring/metrics.duckdb` cresce (~1 MB para 31 coletas de 97 séries + 1.161 eventos) até alguém apagar |
+| DuckDB (extra e) | cada coleta do `/metrics` + o log | **sem limite**: arquivo `monitoring/metrics.duckdb` cresce (~1 MB para 31 coletas = 2.876 linhas, com 32 séries por coleta antes do primeiro pedido e 97 depois, + 1.161 eventos) até alguém apagar |
 
 **Armadilha que encontramos**: cada `bentoml serve` **apaga** `$BENTOML_HOME/prometheus_multiproc_dir` ao subir. Subir um segundo
 serviço na mesma máquina (ou rodar o `pytest`, que sobe o seu) zerava o `/metrics` do primeiro. Os testes agora usam um `BENTOML_HOME`
@@ -427,16 +490,22 @@ App Starlette ([`monitor_api.py`](../monitor_api.py)) montado no serviço com `@
 |---|---|
 | `GET /monitor/variaveis` | uma linha por evento, achatada (`entrada.media_l`, `saida.confianca_geral`, `entrada.hist_l_00`...), em JSON ou `formato=csv` |
 | `GET /monitor/resumo` | por variável numérica: n, mín, Q1, mediana, Q3, p95, máx, média (boxplot) e contagens por faixa (histograma, `faixas=10`) |
-| `GET /monitor/drift` | KS e PSI de cada variável contra `referencia.json`, com p-valor, limite de ruído do PSI e listas com/sem Bonferroni |
+| `GET /monitor/drift` | teste de drift de cada variável contra `referencia.json` (KS nas contínuas, qui-quadrado/Fisher nas discretas), p-valor, PSI com limite de ruído, listas com/sem Bonferroni e, para `precisa_revisao`, a diferença em pontos percentuais com IC 95 % |
 | `GET /monitor/referencia` | os valores da referência, para quem quiser fazer a própria conta |
 
 Filtros (todos opcionais): `inicio`, `fim` (ISO 8601; sem fuso = hora local), `evento` (`resposta` padrão, `pedido`, `todos`),
-`status` (`ok`, `erro_cliente`, `erro_servidor`), `backend` (`simulado`, `ollama`), `limite` (últimas N linhas). Parâmetro inválido = 400.
+`status` (`ok`, `erro_cliente`, `erro_servidor`), `backend` (`simulado`, `ollama`), `carga_id`, `limite` (últimas N linhas);
+no `/resumo`, `faixas` (1 a 1000); no `/drift`, `alfa` (entre 0 e 1). Parâmetro inválido = 400.
+
+O `/monitor/drift` compara **só respostas do backend da referência** (`simulado`, porque a referência foi gerada com ele):
+misturar respostas do modelo real com uma referência simulada acusaria "drift" que é só troca de backend. `?backend=ollama`
+compara as do modelo real mesmo assim, de propósito; o campo `backend_lote` da resposta diz o que foi comparado.
 
 ```bash
 curl -s "localhost:3000/monitor/variaveis?formato=csv&inicio=2026-11-16T20:00" > variaveis.csv
 curl -s "localhost:3000/monitor/variaveis?status=erro_cliente&limite=5"
-curl -s "localhost:3000/monitor/drift?inicio=2026-11-16T20:06:53-03:00&fim=2026-11-16T20:10:31-03:00"
+curl -s "localhost:3000/monitor/drift?carga_id=drift-8"          # compara uma carga com a referência
+curl -s "localhost:3000/monitor/drift?backend=ollama"            # força comparar respostas do modelo real (ver abaixo)
 ```
 
 Saídas reais em [`evidencias/monitor_endpoints.txt`](evidencias/monitor_endpoints.txt). No Swagger (<http://localhost:3000>) só
@@ -461,7 +530,10 @@ recording triagem:taxa_erro:5m ok / triagem:latencia_p95:5m ok / ... ; alerting 
 
 O `increase()` na mesma janela deu 96,4 pedidos 200 e 3,1 pedidos 400, e não 95 e 5: o Prometheus extrapola até as bordas da
 janela e a série do código 400 só passou a existir no primeiro 400 (ele não supõe que valia 0 antes). A contagem exata da janela
-está na planilha e no DuckDB.
+está na planilha e no DuckDB. Consequência para o alerta: **o primeiro erro de um código novo não entra no `increase()`/`rate()`**,
+nem em `triagem:taxa_erro:5m`; só os seguintes. Aqui isso afeta o 400 (e qualquer outro código novo), mas não o 500: o BentoML
+já cria a série do 500 com valor 0 antes do primeiro pedido (está em [`metrics_antes.txt`](evidencias/metrics_antes.txt)), então
+o primeiro 500 já conta. O log e o Loki registram todos.
 
 ## Extra (a): log no Loki
 
@@ -502,8 +574,8 @@ Exemplos em [`consultas.sql`](consultas.sql) (`just duckdb-consultas`); saída r
 | fim | sinal (fonte) | limiar | ação | dono |
 |---|---|---|---|---|
 | saúde | `triagem:taxa_erro:5m` e `triagem:latencia_p95:5m` (Prometheus; alertas em `regras.yml`) | erro > 20 % por 2 min; p95 > 30 s por 2 min | 5xx: ver `erro_tipo` no Loki e o Ollama; 4xx: avisar o time do app; p95: ver se está sem GPU ou com fila | quem opera o serviço |
-| drift de entrada | KS/PSI por foto (`/monitor/drift`, janela de ≥ 150 fotos) | ≥ 3 variáveis de entrada com KS significativo após Bonferroni **e** PSI > 0,25 acima do ruído | olhar os histogramas da janela; confirmar com o time de campo se mudou app, câmera ou condição (chuva, horário); reavaliar com `avaliar.py` | quem mantém o modelo |
-| custo da triagem | `triagem:fracao_revisao:5m` e `saida.precisa_revisao` | +10 pontos percentuais sobre a semana anterior | se a entrada não mudou, revisar prompt/modelo; se mudou, tratar como drift | quem mantém o modelo, com a coordenação da revisão |
+| drift de entrada | teste e PSI por foto (`/monitor/drift`, janela de ≥ 150 fotos) | ≥ 3 variáveis de entrada com KS significativo após Bonferroni **e** PSI > 0,25 acima do ruído | olhar os histogramas da janela; confirmar com o time de campo se mudou app, câmera ou condição (chuva, horário); reavaliar com `avaliar.py` | quem mantém o modelo |
+| custo da triagem | `triagem:fracao_revisao:5m` e `saida.precisa_revisao` (`/monitor/drift` dá a diferença em pp com IC 95 %) | +10 pontos percentuais sobre a semana anterior, com o IC 95 % inteiro acima de 0 | se a entrada não mudou, revisar prompt/modelo; se mudou, tratar como drift | quem mantém o modelo, com a coordenação da revisão |
 
 Os limiares são pontos de partida; o primeiro mês de dados reais deve recalibrá-los.
 
@@ -512,8 +584,11 @@ Os limiares são pontos de partida; o primeiro mês de dados reais deve recalibr
 - [`service.py`](../service.py): a foto agora chega como `PIL.Image.Image` em memória (com `foto: Path` o BentoML gravava o upload no
   disco com o **nome enviado pelo cliente**; nome > 255 bytes dava 500 antes do nosso código). Abrimos a imagem num validador
   próprio porque o conversor padrão do BentoML 1.4.39 responde **500** a arquivo que não é imagem e a `Content-Type: image/jpg`
-  (testado); aqui viram 400 e 200. Continuam: 400 para não-imagem e para formato fora de JPEG/PNG. O middleware do rastro, as
-  métricas e o `/monitor` também entram aqui. `TIMEOUT_SEGUNDOS` (padrão 300) ajusta o tempo limite.
+  (testado); aqui viram 400 e 200. Continuam: 400 para não-imagem e para formato fora de JPEG/PNG. Também viram 400 (antes 500):
+  corpo JSON (`{"foto": "x"}`), multipart com o arquivo em outro campo (`-F arquivo=@foto.jpg`, que dava `UnicodeDecodeError`
+  dentro do BentoML) e `foto` mandada como texto (o BentoML trataria o texto como URL e tentaria baixar). Os dois últimos são
+  barrados pelo middleware, que lê o corpo antes do BentoML. O traceback que o BentoML escreve para cada 400 virou uma linha
+  só. O middleware do rastro, as métricas e o `/monitor` também entram aqui. `TIMEOUT_SEGUNDOS` (padrão 300) ajusta o tempo limite.
 - [`extrator.py`](../extrator.py): `BACKEND` (`ollama` padrão ou `simulado`), tempo de cada chamada, `backend` na resposta.
 - Novos: [`monitoramento.py`](../monitoramento.py) (variáveis, log, métricas, middleware), [`monitor_api.py`](../monitor_api.py),
   [`drift.py`](../drift.py), [`simulado.py`](../simulado.py) e esta pasta.
@@ -529,10 +604,13 @@ just testar-monitoramento                                # sem Ollama (ou: uv ru
 [`tests/test_monitoramento.py`](../tests/test_monitoramento.py) sobe o serviço de verdade no modo simulado, com o log numa pasta
 temporária e arquivos de 6 KB para forçar a rotação, e confere: eventos `pedido`/`resposta` com o mesmo `request_id` e hora ISO com
 microssegundos e fuso; variáveis de entrada e saída presentes; nome do arquivo e número lido **fora** do log; append-only com
-rotação; 400 de não-imagem, WebP e JPEG cortado logados; nome de arquivo de 300 caracteres e `image/jpg` com 200; `/monitor/variaveis`
-(JSON, CSV, filtros, arquivos rotacionados), `/monitor/resumo`, `/monitor/drift`; e o `/metrics` com as métricas do BentoML (faixa
-de 600 s) e as nossas. [`tests/test_drift.py`](../tests/test_drift.py) confere as variáveis (foto escura e borrada mudam as
-variáveis certas) e o KS/PSI (não acusa amostra igual, acusa deslocada, não acusa só por ruído em amostra pequena).
+rotação; 400 de não-imagem, WebP, JPEG cortado, corpo JSON e multipart sem arquivo no campo `foto`, logados; `corpo_bytes` certo
+em upload sem `Content-Length`; nome de arquivo de 300 caracteres e `image/jpg` com 200; `carga_id` no log e como filtro;
+`/monitor/variaveis` (JSON, CSV, filtros, arquivos rotacionados), `/monitor/resumo`, `/monitor/drift` (só o backend da referência)
+e 400 para parâmetro inválido; e o `/metrics` com as métricas do BentoML (faixa de 600 s) e as nossas.
+[`tests/test_drift.py`](../tests/test_drift.py) confere as variáveis (foto escura e borrada mudam as variáveis certas) e os testes
+de drift: não acusa amostra igual, acusa deslocada, não acusa só por ruído em amostra pequena, usa qui-quadrado e acusa o caso
+real 34 % → 51 % de `precisa_revisao` (+16,9 pp com IC acima de 0), e Fisher em categoria de texto com contagem baixa.
 Resultado nesta máquina: [`evidencias/pytest.txt`](evidencias/pytest.txt).
 
 ## Arquivos desta entrega
@@ -541,11 +619,12 @@ Resultado nesta máquina: [`evidencias/pytest.txt`](evidencias/pytest.txt).
 |---|---|
 | `monitoramento.py` | variáveis de entrada/saída, log JSONL com rotação, métricas próprias, middleware do rastro |
 | `monitor_api.py` | `GET /monitor/*` |
-| `drift.py` | KS e PSI contra a referência |
+| `drift.py` | testes de drift (KS, qui-quadrado/Fisher) e PSI contra a referência |
 | `simulado.py` | backend simulado para teste de carga |
 | `monitoring/gerar_carga.py`, `variacoes.py` | gerador de carga com variações feitas em memória (nenhuma foto nova em disco) |
 | `monitoring/referencia.py`, `referencia.json` | conjunto de referência (só números) |
-| `monitoring/analise.py`, `analise/` | KS/PSI, histogramas e boxplots (SVG) |
+| `monitoring/analise.py`, `analise/` | testes de drift, PSI, histogramas e boxplots (SVG); saída padrão em `monitoring/saida/` (fora do git) |
+| `monitoring/alarme_falso.py` | taxa de alarme falso dos testes quando não há drift (reamostragem da referência) |
 | `monitoring/planilha_metrics.py`, `analise_metrics.xlsx` | planilha do `/metrics` com fórmulas |
 | `monitoring/metrics_to_duckdb.py`, `consultas.sql` | DuckDB |
 | `monitoring/docker-compose.yml`, `prometheus/`, `loki/`, `promtail/`, `grafana/` | pilha (imagens fixadas: `prom/prometheus:v3.1.0`, `grafana/loki:3.3.2`, `grafana/promtail:3.3.2`, `grafana/grafana:11.4.0`) |
@@ -557,5 +636,7 @@ Feito com Claude Code (Claude Opus 5.5), a partir das decisões da equipe (modo 
 dois eventos por pedido, extras). O que a execução corrigiu no caminho: o conversor de imagem do BentoML dava 500 para arquivo
 inválido (validador próprio); o PSI acusava drift em amostra sem drift por causa do tamanho da amostra (piso de ruído e referência
 maior); um segundo `bentoml serve` zerava o `/metrics` do primeiro (`BENTOML_HOME` próprio nos testes); a contagem de janela no
-DuckDB perdia a série que nasce no meio da janela (consulta corrigida). Todos os números deste documento saíram de execuções
-guardadas em `evidencias/` e `analise/`.
+DuckDB perdia a série que nasce no meio da janela (consulta corrigida). Uma revisão independente (outro agente, sem acesso ao
+nosso raciocínio) achou: KS aplicado a variáveis 0/1 escondia o aumento de revisão (trocado por qui-quadrado/Fisher), 500 para
+corpo JSON e campo errado, porta ambígua nas receitas, roteiro que sobrescrevia os entregáveis e números do README sem
+evidência salva; tudo corrigido. Todos os números deste documento saíram de execuções guardadas em `evidencias/` e `analise/`.
