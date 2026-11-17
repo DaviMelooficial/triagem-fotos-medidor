@@ -84,9 +84,13 @@ pilha:
     mkdir -p logs
     docker compose -f monitoring/docker-compose.yml up -d
 
-# Derruba a pilha (os dados ficam nos volumes; para apagar também: docker compose -f monitoring/docker-compose.yml down -v)
+# Derruba a pilha; os dados do Prometheus e do Loki ficam nos volumes para a próxima subida
 pilha-parar:
     docker compose -f monitoring/docker-compose.yml down
+
+# Derruba a pilha e apaga os volumes (histórico do Prometheus e do Loki)
+pilha-limpar:
+    docker compose -f monitoring/docker-compose.yml down -v
 
 # Copia o /metrics para o DuckDB (monitoring/metrics.duckdb) N vezes, a cada 5 s, e carrega o log na tabela eventos
 duckdb coletas="12":

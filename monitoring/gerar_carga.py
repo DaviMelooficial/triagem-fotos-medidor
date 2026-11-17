@@ -5,7 +5,8 @@ Perfis (--perfil):
   drift   fotos escuras, estouradas, borradas, P&B, pequenas, giradas: KS/PSI devem acusar
   misto   70 % normal + 30 % drift (padrão)
 Em qualquer perfil, --invalidos (padrão 0,1) é a fração de arquivos que devem dar 400.
-Cada pedido leva o cabeçalho X-Carga-Id (padrão: <perfil>-<seed>), que o serviço grava no log como carga_id:
+Cada pedido leva o cabeçalho X-Carga-Id (padrão: <perfil>-<seed>-<data e hora>, único por execução), que o serviço
+grava no log como carga_id:
 a análise e o /monitor filtram por ele, sem depender de horário.
 
 Uso: uv run python monitoring/gerar_carga.py --n 100 [--perfil misto] [--url http://localhost:3000] [--paralelo 2]
@@ -18,6 +19,7 @@ import statistics
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
 import httpx
 
@@ -67,11 +69,12 @@ def main() -> None:
     parser.add_argument("--paralelo", type=int, default=2, help="pedidos simultâneos (o serviço atende 1 por vez; o resto espera na fila)")
     parser.add_argument("--seed", type=int, default=None, help="fixa a sequência de fotos (padrão: aleatória)")
     parser.add_argument("--timeout", type=float, default=900)
-    parser.add_argument("--carga-id", help="rótulo gravado no log (padrão: <perfil>-<seed>)")
+    parser.add_argument("--carga-id", help="rótulo gravado no log (padrão: <perfil>-<seed>-<AAAAMMDDTHHMMSS>)")
     args = parser.parse_args()
 
     seed = args.seed if args.seed is not None else random.randrange(1_000_000)
-    carga_id = args.carga_id or f"{args.perfil}-{seed}"
+    # A data e hora no padrão impede que duas execuções com a mesma seed caiam no mesmo carga_id.
+    carga_id = args.carga_id or f"{args.perfil}-{seed}-{datetime.now():%Y%m%dT%H%M%S}"
     pedidos = montar_pedidos(args.n, args.perfil, args.invalidos, seed)
     print(f"Enviando {len(pedidos)} pedidos para {args.url}/extrair (perfil {args.perfil}, seed {seed}, {args.paralelo} em paralelo)")
     print(f"carga_id = {carga_id}  (filtre com: just analise {carga_id})")
