@@ -1,7 +1,9 @@
-Cenário sem drift: 1000 rodadas, referência 200 x lote 170, 24 variáveis
+Cenário sem drift: 1000 rodadas, referência 200 x lote 170, 22 variáveis
   pelo menos 1 teste com p < 0,05: 441/1000 = 44.1% das rodadas
-  pelo menos 1 teste após Bonferroni: 25/1000 = 2.5% das rodadas
+  pelo menos 1 teste após Bonferroni: 28/1000 = 2.8% das rodadas
   pelo menos 1 PSI com drift: 63/1000 = 6.3% das rodadas
   PSI com alarme falso, por variável: {'entrada.contraste_l': 11, 'entrada.croma_medio': 11, 'entrada.bytes_por_pixel': 8, 'entrada.entropia_l': 7, 'entrada.media_g': 6, 'entrada.media_b': 5, 'entrada.razao_aspecto': 4, 'entrada.media_l': 4, 'entrada.nitidez_laplaciano': 4, 'entrada.megapixels': 4, 'entrada.frac_estourados': 3, 'entrada.media_r': 2, 'entrada.frac_escuros': 2}
 
 # comando: uv run python monitoring/alarme_falso.py --rodadas 1000
+# supõe amostras independentes: sorteia cada uma das 200 amostras da referência como se fosse uma foto diferente;
+# não capta que elas vêm de só 4 fotos (amostras da mesma foto se parecem), então a taxa real tende a ser maior.

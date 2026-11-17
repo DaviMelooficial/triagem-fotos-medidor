@@ -1,7 +1,7 @@
 Análise do log (inferencia.jsonl e rotacionados), carga_id=normal-7, backend simulado
 eventos resposta: 200 {'ok': 169, 'erro_cliente': 31}; usados nos testes (status ok): 169; referência: 200
-25 testes (24 variáveis + KS por pixel); alfa 0,05; Bonferroni: p < 0,05/25 = 0.0020
-KS: com estes n, D precisa passar de 0.1419 para dar p < 0,05 e de 0.1942 com Bonferroni (valor crítico, não é o poder do teste)
+23 testes (22 variáveis + KS por pixel); alfa 0,05; Bonferroni: p < 0,05/23 = 0.0022
+KS: com estes n, D precisa passar de 0.1419 para dar p < 0,05 e de 0.193 com Bonferroni (valor crítico, não é o poder do teste)
 
 Contínuas (KS):
 variável                        média ref  média log    KS D         p     PSI lim.ruído  drift?
@@ -22,14 +22,12 @@ entrada.entropia_l                  3.503      3.478   0.087     0.458   0.056  
 Discretas/categóricas (qui-quadrado; Fisher se esperado < 5):
 variável                                     teste         p     PSI lim.ruído  drift?  maiores mudanças (ref -> log)
 saida.confianca_geral            fisher_montecarlo     0.132   0.036     0.065  -       0.67: 34% -> 25% | 1: 66% -> 75% | 0.33: 0% -> 1%
-saida.confianca_numero_medidor                qui2     0.541   0.006     0.042  -       1: 88% -> 91% | 0.67: 12% -> 9%
+saida.confianca_numero_medidor                qui2     0.541   0.006     0.042  -       0.67: 12% -> 9% | 1: 88% -> 91%
 saida.confianca_funcao                        qui2      0.18   0.025     0.042  -       1: 88% -> 92% | 0.67: 12% -> 8%
 saida.confianca_leitura          fisher_montecarlo     0.722   0.009     0.065  -       0.67: 14% -> 11% | 1: 85% -> 88% | 0.33: 0% -> 1%
-saida.precisa_revisao                         qui2    0.0946   0.035     0.042  -       1: 34% -> 25% | 0: 66% -> 75%
+saida.precisa_revisao                         qui2    0.0946   0.035     0.042  -       0: 66% -> 75% | 1: 34% -> 25%
 saida.n_campos_nulos             nenhum (uma categoria só)         1   0.000     0.042  -       0: 100% -> 100%
 saida.leitura_suspeita                      fisher         1   0.004     0.042  -       0: 100% -> 100% | 1: 0% -> 0%
-saida.respostas_identicas                     qui2    0.0946   0.035     0.042  -       1: 66% -> 75% | 0: 34% -> 25%
-saida.votos_distintos_leitura    fisher_montecarlo     0.724   0.009     0.065  -       2: 14% -> 11% | 1: 85% -> 88% | 3: 0% -> 1%
 saida.leitura_n_digitos          fisher_montecarlo     0.825   0.007     0.065  -       6: 48% -> 50% | 5: 52% -> 50% | 10: 0% -> 0%
 saida.funcao                                  qui2     0.805   0.017     0.104  -       kWh: 16% -> 21% | 03: 18% -> 17% | kvarh: 22% -> 20%
 
@@ -37,5 +35,5 @@ precisa_revisao (KPI): 34.0% na referência -> 25.4% no log; diferença -8.6 pp,
 KS por pixel (histograma de L somado, como na aula 003): D=0.0095, p=1.0, drift=False
 
 Com drift (p < 0,05): ['entrada.contraste_l']
-Com drift após Bonferroni (p < 0.0020): nenhuma
+Com drift após Bonferroni (p < 0.0022): nenhuma
 Com drift no PSI (> 0,25 e acima do ruído; sem correção de multiplicidade): nenhuma
