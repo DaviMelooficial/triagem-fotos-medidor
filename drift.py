@@ -57,11 +57,11 @@ CATEGORICAS = [
     "saida.precisa_revisao",
     "saida.n_campos_nulos",
     "saida.leitura_suspeita",
-    "saida.respostas_identicas",
-    "saida.votos_distintos_leitura",
     "saida.leitura_n_digitos",
     "saida.funcao",
 ]
+# Fora dos testes (continuam no log): respostas_identicas é o inverso de precisa_revisao e votos_distintos_leitura
+# é função 1:1 de confianca_leitura; testá-las repetiria o mesmo teste e só aumentaria a correção de Bonferroni.
 VARIAVEIS = CONTINUAS + CATEGORICAS
 N_TESTES = len(VARIAVEIS) + 1  # + KS por pixel
 

@@ -54,13 +54,13 @@ def test_psi_com_amostra_pequena_nao_marca_drift_so_por_ruido():
 
 
 def test_variavel_binaria_usa_qui_quadrado_e_acusa_34_para_51_por_cento():
-    # Caso real da carga drift: precisa_revisao 34 % (68/200) na referência e 51 % (88/173) no log.
+    # Caso real da carga drift-8: precisa_revisao 34 % (68/200) na referência e 51,4 % (89/173) no log.
     # O KS em variável 0/1 dava p = 0,006, que não passa no Bonferroni; o qui-quadrado passa.
     referencia = {"n": 200, "variaveis": {"saida.precisa_revisao": [True] * 68 + [False] * 132}, "hist_l_soma": [1] * 16}
-    lote = [{"saida.precisa_revisao": v} for v in [True] * 88 + [False] * 85]
+    lote = [{"saida.precisa_revisao": v} for v in [True] * 89 + [False] * 84]
     v = drift.comparar(lote, referencia)["variaveis"]["saida.precisa_revisao"]
     assert v["teste"] == "qui2" and v["drift_bonferroni"]
-    assert v["diferenca"]["diferenca_pp"] == 16.87 and v["diferenca"]["ic95_pp"][0] > 0
+    assert v["diferenca"]["diferenca_pp"] == 17.45 and v["diferenca"]["ic95_pp"][0] > 0
 
 
 def test_categoria_de_texto_e_contagem_baixa_usam_fisher():

@@ -3,7 +3,8 @@
 Sorteia, com reposição, uma "referência" de 200 e um "lote" de N amostras do MESMO conjunto
 (monitoring/referencia.json) e roda drift.comparar. Como as duas vêm da mesma distribuição, todo
 alarme é falso. Conta, por rodada, se houve pelo menos um alarme em cada critério.
-É uma aproximação: os dois lados saem do mesmo conjunto finito de 200 (4 fotos x 50 variações).
+É uma aproximação que supõe amostras independentes: cada uma das 200 (4 fotos x 50 variações) é sorteada como se
+fosse uma foto diferente, sem captar o agrupamento por foto; a taxa real de alarme falso tende a ser maior.
 
 Uso: uv run python monitoring/alarme_falso.py [--rodadas 300] [--lote 170]
 """

@@ -36,7 +36,7 @@ VARIAVEIS_ENTRADA = [
 ]
 VARIAVEIS_SAIDA = [
     "confianca_geral", "confianca_numero_medidor", "confianca_funcao", "confianca_leitura", "precisa_revisao",
-    "n_campos_nulos", "leitura_suspeita", "respostas_identicas", "votos_distintos_leitura", "leitura_n_digitos", "funcao",
+    "n_campos_nulos", "leitura_suspeita", "leitura_n_digitos", "funcao",
 ]
 
 
