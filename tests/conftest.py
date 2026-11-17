@@ -69,6 +69,7 @@ def servico_simulado(tmp_path_factory):
         "LOG_DIR": str(pasta_log),
         "LOG_MAX_BYTES": "6000",  # ~3 pedidos por arquivo: a rotação acontece durante os testes
         "LOG_BACKUPS": "50",
+        "MAX_UPLOAD_MB": "1",  # limite pequeno para testar o 413 sem mandar 20 MB
     }
     servidor, base = subir(env, tmp_path_factory.mktemp("bentoml_simulado"))
     yield base, pasta_log

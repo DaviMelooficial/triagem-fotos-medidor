@@ -62,7 +62,12 @@ class SemTracebackDeErroDoCliente(logging.Filter):
     def filter(self, registro: logging.LogRecord) -> bool:
         erro = registro.exc_info[1] if registro.exc_info else None
         if isinstance(erro, (InvalidArgument, ValidationError)):
-            registro.msg, registro.args = f"%s (erro do cliente, 400): {erro}", (registro.getMessage(),)
+            if isinstance(erro, ValidationError):  # só as mensagens: sem input_value (bytes da foto) no terminal
+                detalhe = "; ".join(e["msg"] for e in erro.errors(include_input=False, include_url=False))
+            else:
+                detalhe = str(erro)
+            # "%s" + args: um "%" no texto do erro não quebra a formatação do logging
+            registro.msg, registro.args = "%s", (f"{registro.getMessage()} (erro do cliente, 400): {detalhe}",)
             registro.levelno, registro.levelname, registro.exc_info, registro.exc_text = logging.INFO, "INFO", None, None
         return True
 

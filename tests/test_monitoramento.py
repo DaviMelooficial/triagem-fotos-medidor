@@ -7,7 +7,9 @@ e o /metrics no formato Prometheus.
 
 import io
 import json
+import logging
 import re
+import socket
 import time
 from pathlib import Path
 
@@ -142,6 +144,72 @@ def test_corpo_bytes_conta_upload_sem_content_length(servico_simulado):
     assert final["corpo_bytes"] > len(FOTO)
 
 
+def test_upload_acima_do_limite_da_413_e_fica_no_log(servico_simulado):
+    base, pasta = servico_simulado
+    grande = b"\xff" * (2 * 1024 * 1024)  # 2 MB, acima do MAX_UPLOAD_MB=1 do teste
+    resposta = enviar(base, grande)  # com Content-Length: recusado antes de ler
+    assert resposta.status_code == 413
+    (final,) = eventos(pasta, resposta.headers["x-request-id"])
+    assert (final["status"], final["erro_tipo"]) == ("erro_cliente", "upload_grande") and final["corpo_bytes"] > 2 * 1024 * 1024
+
+    def pedacos():  # sem Content-Length: recusado ao passar do limite durante a leitura
+        yield b'--lim\r\nContent-Disposition: form-data; name="foto"; filename="f.jpg"\r\n\r\n'
+        for _ in range(32):
+            yield b"\xff" * 65536
+
+    resposta = httpx.post(f"{base}/extrair", content=pedacos(), timeout=60, headers={"content-type": "multipart/form-data; boundary=lim"})
+    assert resposta.status_code == 413
+    (final,) = eventos(pasta, resposta.headers["x-request-id"])
+    assert final["erro_tipo"] == "upload_grande"
+
+
+@pytest.mark.parametrize("dados,tipo", [(b"foto=abc", "application/x-www-form-urlencoded"), (FOTO, "image/jpeg"), (b"oi", "text/plain")])
+def test_content_type_que_nao_e_multipart_nem_json_da_400(servico_simulado, dados, tipo):
+    # urlencoded "foto=abc" dava 500 (o BentoML tentava baixar "abc" como URL).
+    base, pasta = servico_simulado
+    resposta = httpx.post(f"{base}/extrair", content=dados, headers={"content-type": tipo}, timeout=60)
+    assert resposta.status_code == 400
+    (final,) = eventos(pasta, resposta.headers["x-request-id"])
+    assert final["erro_tipo"] == "content_type_nao_aceito"
+
+
+def test_cliente_que_desconecta_no_meio_do_upload_fica_marcado(servico_simulado):
+    base, pasta = servico_simulado
+    porta = int(base.rsplit(":", 1)[1])
+    with socket.create_connection(("127.0.0.1", porta)) as conexao:
+        conexao.sendall(
+            b"POST /extrair HTTP/1.1\r\nHost: localhost\r\nX-Carga-Id: desconecta-1\r\n"
+            b"Content-Type: multipart/form-data; boundary=lim\r\nContent-Length: 100000\r\n\r\n" + b"x" * 1000
+        )
+    for _ in range(40):
+        linhas = [json.loads(linha) for linha in conteudo_do_log(pasta).splitlines()]
+        achados = [e for e in linhas if e.get("carga_id") == "desconecta-1"]
+        if achados:
+            break
+        time.sleep(0.05)
+    (final,) = achados
+    assert (final["erro_tipo"], final["http_status"], final["corpo_bytes"]) == ("cliente_desconectou", 499, 1000)
+    assert final["entrada"] is None  # corpo parcial não foi para o modelo
+
+
+def test_filtro_do_terminal_nao_quebra_com_porcento_nem_mostra_os_bytes():
+    from pydantic import TypeAdapter, ValidationError
+
+    import service
+
+    try:
+        TypeAdapter(int).validate_python(b"\xff\xd8 100% foto")
+    except ValidationError:
+        registro = logging.LogRecord("x", logging.ERROR, __file__, 1, "Exception on %s [%s]", ("/extrair", "POST"), None)
+        import sys
+
+        registro.exc_info = sys.exc_info()
+    service.SemTracebackDeErroDoCliente().filter(registro)
+    texto = logging.Formatter("%(levelname)s %(message)s").format(registro)
+    assert texto.startswith("INFO Exception on /extrair [POST] (erro do cliente, 400):")
+    assert "100%" not in texto and "xd8" not in texto and "Traceback" not in texto
+
+
 def test_jpeg_cortado_devolve_400(servico_simulado):
     base, _ = servico_simulado
     assert enviar(base, FOTO[: len(FOTO) // 3]).status_code == 400
@@ -157,7 +225,7 @@ def test_monitor_variaveis_json_csv_e_filtros(servico_simulado):
     linha_ok = next(linha for linha in respostas["linhas"] if linha["status"] == "ok")
     assert {"entrada.media_l", "entrada.hist_l_15", "saida.confianca_geral", "latencia_total_s"} <= set(linha_ok)
     erros = httpx.get(f"{base}/monitor/variaveis", params={"status": "erro_cliente"}).json()
-    assert erros["n"] >= 1 and all(linha["http_status"] == 400 for linha in erros["linhas"])
+    assert erros["n"] >= 1 and all(400 <= linha["http_status"] < 500 for linha in erros["linhas"])
     pedidos = httpx.get(f"{base}/monitor/variaveis", params={"evento": "pedido", "limite": 2}).json()
     assert pedidos["n"] == 2 and all(linha["evento"] == "pedido" for linha in pedidos["linhas"])
     csv = httpx.get(f"{base}/monitor/variaveis", params={"formato": "csv"})

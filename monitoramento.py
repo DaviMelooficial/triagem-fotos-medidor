@@ -196,14 +196,17 @@ def observar_resultado(rastro: dict, resultado: dict) -> None:
 
 CARGA_ID_VALIDO = re.compile(r"[A-Za-z0-9_.:-]{1,64}")
 MENSAGEM_SEM_FOTO = 'Envie a foto como arquivo no campo multipart "foto" (ex.: curl -F "foto=@foto.jpg").'
+# Limite do upload: o corpo é lido inteiro em memória (aqui e no BentoML). Foto de medidor tem centenas de KB.
+MAX_UPLOAD_BYTES = int(float(os.environ.get("MAX_UPLOAD_MB") or 20) * 1024 * 1024)
+MENSAGEM_GRANDE = f"Arquivo maior que {MAX_UPLOAD_BYTES // (1024 * 1024)} MB (MAX_UPLOAD_MB). Envie uma foto menor."
 
 
-async def _conferir_multipart(scope, corpo: bytes, cabecalhos: dict) -> str | None:
+async def _conferir_multipart(scope, corpo: bytes, cabecalhos: dict) -> bool:
     """Recusa (400) multipart sem um ARQUIVO no campo "foto". Sem isso o BentoML dava 500: com o campo
     com outro nome ele tenta ler a foto como texto (UnicodeDecodeError), e com "foto" em texto ele trata
-    o texto como URL e tenta baixar."""
+    o texto como URL e tenta baixar. Devolve True quando o pedido deve ser recusado."""
     if not cabecalhos.get("content-type", "").startswith("multipart/form-data"):
-        return None  # JSON e outros: o validador do service.py responde 400
+        return False  # JSON: o validador do service.py responde 400
 
     async def receber():
         return {"type": "http.request", "body": corpo, "more_body": False}
@@ -211,10 +214,10 @@ async def _conferir_multipart(scope, corpo: bytes, cabecalhos: dict) -> str | No
     try:
         formulario = await Request(scope, receber).form()
     except Exception:
-        return MENSAGEM_SEM_FOTO  # multipart malformado
+        return True  # multipart malformado
     try:
         foto = formulario.get("foto")
-        return None if isinstance(foto, UploadFile) else MENSAGEM_SEM_FOTO
+        return not isinstance(foto, UploadFile)
     finally:
         await formulario.close()
 
@@ -240,29 +243,11 @@ class RastroMiddleware:
             "entrada": None,
             "saida": None,
             "erro_tipo": None,
+            # até o corpo ser lido, vale o tamanho declarado (é o que fica se o pedido for recusado antes)
+            "corpo_bytes": int(cabecalhos.get("content-length", "")) if cabecalhos.get("content-length", "").isdigit() else 0,
         }
         scope[CHAVE_SCOPE] = rastro  # o endpoint lê e preenche este mesmo dicionário
         resposta = {"status": 500, "corpo": b""}
-
-        # Lê o corpo inteiro (o BentoML também lê tudo antes de validar): assim contamos os bytes
-        # de verdade, mesmo sem Content-Length (upload chunked), e conferimos o campo "foto".
-        corpo = bytearray()
-        while True:
-            mensagem = await receive()
-            if mensagem["type"] != "http.request":
-                break  # cliente desconectou
-            corpo += mensagem.get("body", b"")
-            if not mensagem.get("more_body", False):
-                break
-        rastro["corpo_bytes"] = len(corpo)
-        entregue = False
-
-        async def receber():
-            nonlocal entregue
-            if not entregue:
-                entregue = True
-                return {"type": "http.request", "body": bytes(corpo), "more_body": False}
-            return await receive()
 
         async def enviar(mensagem):
             if mensagem["type"] == "http.response.start":
@@ -273,11 +258,56 @@ class RastroMiddleware:
                 resposta["corpo"] += mensagem.get("body", b"")[:2000]
             await send(mensagem)
 
+        async def recusar(status: int, tipo: str, mensagem: str):
+            rastro["erro_tipo"] = tipo
+            await JSONResponse([{"error": mensagem}], status_code=status)(scope, receive, enviar)
+
         try:
-            recusa = await _conferir_multipart(scope, bytes(corpo), cabecalhos)
-            if recusa:
-                rastro["erro_tipo"] = "campo_foto_ausente"
-                await JSONResponse([{"error": recusa}], status_code=400)(scope, receber, enviar)
+            # Só multipart (o caminho documentado) e JSON (o validador responde 400). Outros tipos davam
+            # 500 no BentoML (ex.: urlencoded "foto=abc" vira URL para baixar) ou 400 confuso.
+            tipo_conteudo = cabecalhos.get("content-type", "").split(";")[0].strip().lower()
+            if tipo_conteudo not in ("multipart/form-data", "application/json"):
+                await recusar(400, "content_type_nao_aceito", MENSAGEM_SEM_FOTO)
+                return
+            declarado = cabecalhos.get("content-length", "")
+            if declarado.isdigit() and int(declarado) > MAX_UPLOAD_BYTES:
+                rastro["corpo_bytes"] = int(declarado)
+                await recusar(413, "upload_grande", MENSAGEM_GRANDE)
+                return
+            # Lê o corpo inteiro (o BentoML também lê tudo antes de validar): assim contamos os bytes de
+            # verdade, mesmo sem Content-Length (upload chunked), conferimos o campo "foto" e paramos no limite.
+            partes, lidos = [], 0
+            while True:
+                mensagem = await receive()
+                if mensagem["type"] != "http.request":
+                    rastro["corpo_bytes"] = lidos
+                    rastro["erro_tipo"] = "cliente_desconectou"  # corpo parcial: não vai para o modelo
+                    # 499 = convenção do nginx para "o cliente fechou antes da resposta". A resposta é enviada
+                    # mesmo assim (o servidor a descarta): sem ela o uvicorn não fecha o ciclo e trava ao desligar.
+                    await JSONResponse([{"error": "cliente desconectou"}], status_code=499)(scope, receive, enviar)
+                    return
+                partes.append(mensagem.get("body", b""))
+                lidos += len(partes[-1])
+                if lidos > MAX_UPLOAD_BYTES:
+                    rastro["corpo_bytes"] = lidos
+                    await recusar(413, "upload_grande", MENSAGEM_GRANDE)
+                    return
+                if not mensagem.get("more_body", False):
+                    break
+            corpo = b"".join(partes)  # uma cópia só, reaproveitada abaixo
+            del partes
+            rastro["corpo_bytes"] = len(corpo)
+            entregue = False
+
+            async def receber():
+                nonlocal entregue
+                if not entregue:
+                    entregue = True
+                    return {"type": "http.request", "body": corpo, "more_body": False}
+                return await receive()
+
+            if await _conferir_multipart(scope, corpo, cabecalhos):
+                await recusar(400, "campo_foto_ausente", MENSAGEM_SEM_FOTO)
             else:
                 await self.app(scope, receber, enviar)
         finally:
