@@ -429,10 +429,11 @@ uma planilha refeita sem LibreOffice é calculada ao abrir no Excel, LibreOffice
 números (vai para `monitoring/saida/analise_metrics.xlsx`, sem tocar na da entrega):
 
 ```bash
-just metrics-foto antes.txt      # ou: uv run python monitoring/planilha_metrics.py --foto antes.txt --url http://localhost:3000
+just metrics-foto monitoring/saida/antes.txt    # ou: uv run python monitoring/planilha_metrics.py --foto monitoring/saida/antes.txt --url http://localhost:3000
 just carga 50
-just metrics-foto depois.txt
-just planilha antes.txt depois.txt   # ou: uv run python monitoring/planilha_metrics.py --antes antes.txt --depois depois.txt
+just metrics-foto monitoring/saida/depois.txt
+just planilha monitoring/saida/antes.txt monitoring/saida/depois.txt
+# ou: uv run python monitoring/planilha_metrics.py --antes monitoring/saida/antes.txt --depois monitoring/saida/depois.txt
 ```
 
 O passo a passo do que a planilha calcula:

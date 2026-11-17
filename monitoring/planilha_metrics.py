@@ -15,7 +15,8 @@ Uso:
   uv run python monitoring/planilha_metrics.py --foto depois.txt
   uv run python monitoring/planilha_metrics.py --antes antes.txt --depois depois.txt
   Só --depois (sem --antes) = janela desde a subida do serviço.
-  Com just: just metrics-foto antes.txt; just carga 50; just metrics-foto depois.txt; just planilha antes.txt depois.txt
+  Com just: just metrics-foto monitoring/saida/antes.txt; just carga 50; just metrics-foto monitoring/saida/depois.txt;
+            just planilha monitoring/saida/antes.txt monitoring/saida/depois.txt
 """
 
 import argparse
@@ -298,6 +299,7 @@ def main() -> None:
     parser.add_argument("--recalcular", action="store_true", help="grava os valores calculados com o LibreOffice, se houver")
     args = parser.parse_args()
     if args.foto:
+        args.foto.parent.mkdir(parents=True, exist_ok=True)
         args.foto.write_text(httpx.get(f"{args.url}/metrics", timeout=10).text, encoding="utf-8")
         print(f"/metrics salvo em {args.foto}")
         return
