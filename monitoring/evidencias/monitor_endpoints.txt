@@ -1,0 +1,32 @@
+# Endpoints GET /monitor/* (serviço simulado na porta 3370, 2026-11-16T21:23:12-03:00); mesmas cargas da análise (carga_id normal-7 e drift-8)
+
+$ curl -s "http://localhost:3370/monitor/variaveis?formato=csv&carga_id=drift-8&limite=2" | cut -c1-300
+ts,ts_epoch,evento,versao_log,request_id,endpoint,backend,modelo,n_respostas,http_status,status,erro_tipo,erro_msg,latencia_total_s,corpo_bytes,carga_id,entrada.sha256,entrada.bytes,entrada.formato,entrada.modo_cor,entrada.largura,entrada.altura,entrada.megapixels,entrada.razao_aspecto,entrada.bytes
+2026-11-16T20:57:51.002597-03:00,1794873471.002597,resposta,1,ba9d6bb4107d437abef117cfe87ecacd,/extrair,simulado,simulado,3,200,ok,,,2.5092,19404,drift-8,93d21739252dd72be7eddd72d87b2f86baeec68d5265640c57f262426d643130,19233,JPEG,RGB,360,480,0.1728,0.75,0.1113,False,143.663,148.294,144.829,125.524,4
+2026-11-16T20:57:51.965858-03:00,1794873471.965858,resposta,1,e5b545ad2f6a493aad077bed303619f4,/extrair,simulado,simulado,3,200,ok,,,2.1014,267779,drift-8,32d112617066844ef8a5da64f3dd6b77e206792db32f1cb9d1dbe012f0ad163a,267608,JPEG,RGB,1600,1200,1.92,1.3333,0.1394,False,151.397,155.521,152.175,136.5
+
+$ curl -s "http://localhost:3370/monitor/variaveis?status=erro_cliente&carga_id=drift-8&limite=1"
+{"n":1,"linhas":[{"ts":"2026-11-16T20:57:48.491518-03:00","ts_epoch":1794873468.491518,"evento":"resposta","versao_log":1,"request_id":"bc021e2727044efa92247b1b7cc1ef71","endpoint":"/extrair","backend":"simulado","modelo":"simulado","n_respostas":3,"http_status":400,"status":"erro_cliente","erro_tipo":"InvalidArgument","erro_msg":"Formato WEBP não aceito. Envie uma foto JPEG ou PNG.","latencia_total_s":1.1638,"corpo_bytes":2821,"carga_id":"drift-8","entrada.sha256":"b467f58014e2c391c39d01020163e840f0cfe5e950a059c0eaecc324b99867f6","entrada.bytes":2650,"entrada.formato":"WEBP","entrada.modo_cor":"RGB","entrada.largura":90,"entrada.altura":160,"entrada.megapixels":0.0144,"entrada.razao_aspecto":0.5625,"entrada.bytes_por_pixel":0.184,"entrada.tem_exif":false,"entrada.media_l":130.833,"entrada.media_r":131.105,"entrada.media_g":131.247,"entrada.media_b":128.012,"entrada.contraste_l":59.69,"entrada.croma_medio":0.1226,"entrada.nitidez_laplaciano":838.33,"entrada.frac_escuros":0.0265,"entrada.frac_estourados":0.0408,"entrada.entropia_l":3.7391,"entrada.hist_l_00":0.00347,"entrada.hist_l_01":0.02306,"entrada.hist_l_02":0.04382,"entrada.hist_l_03":0.09993,"entrada.hist_l_04":0.11743,"entrada.hist_l_05":0.04924,"entrada.hist_l_06":0.03924,"entrada.hist_l_07":0.10833,"entrada.hist_l_08":0.0809,"entrada.hist_l_09":0.05937,"entrada.hist_l_10":0.07972,"entrada.hist_l_11":0.09396,"entrada.hist_l_12":0.08701,"entrada.hist_l_13":0.07368,"entrada.hist_l_14":0.03285,"entrada.hist_l_15":0.00799}]}
+
+$ curl -s "http://localhost:3370/monitor/resumo?carga_id=drift-8"  (contagem e 2 variáveis)
+n = 200 {'ok': 173, 'erro_cliente': 27}
+latencia_total_s {"n": 200, "min": 0.0023, "q1": 1.868225, "mediana": 2.1917, "q3": 2.498275, "p95": 2.901439999999999, "max": 3.2466, "media": 2.0272345, "histograma": {"limites": [0.0023, 0.32673, 0.65116, 0.97559, 1.30002, 1.62445, 1.94888, 2.27331, 2.59774, 2.92217, 3.2466], "contagens": [13, 0, 4, 16, 8, 15, 60, 48, 26, 10]}}
+entrada.media_l {"n": 187, "min": 26.73, "q1": 130.667, "mediana": 142.212, "q3": 151.399, "p95": 233.3241, "max": 240.635, "media": 142.6365614973262, "histograma": {"limites": [26.73, 48.1205, 69.511, 90.9015, 112.292, 133.6825, 155.073, 176.4635, 197.854, 219.2445, 240.635], "contagens": [13, 10, 0, 0, 40, 94, 0, 2, 4, 24]}}
+
+$ curl -s "http://localhost:3370/monitor/drift?carga_id=drift-8"  (resumo; mesmos números de analise/drift_ks_psi.txt)
+{'backend_referencia': 'simulado', 'backend_lote': 'simulado', 'n_lote': 173, 'n_referencia': 200, 'n_testes': 23, 'alfa_bonferroni': 0.002173913043478261, 'ks_d_critico': 0.141, 'ks_d_critico_bonferroni': 0.1918}
+entrada.media_l {"tipo": "continua", "teste": "ks", "n_ref": 200, "n_lote": 173, "media_ref": 140.203, "media_lote": 143.044, "estatistica": 0.2563, "p_valor": 7.343e-06, "psi": 1.5981, "psi_leitura": "forte", "psi_faixas": 10, "psi_limite_ruido_95": 0.1824, "psi_drift": true, "drift": true, "drift_bonferroni": true}
+saida.precisa_revisao {"tipo": "categorica", "teste": "qui2", "n_ref": 200, "n_lote": 173, "proporcoes_ref": {"0": 0.66, "1": 0.34}, "proporcoes_lote": {"0": 0.4855, "1": 0.5145}, "estatistica": 10.8772, "p_valor": 0.0009736, "psi": 0.1245, "psi_leitura": "moderado", "psi_faixas": 2, "psi_limite_ruido_95": 0.0414, "psi_drift": false, "drift": true, "drift_bonferroni": true, "diferenca": {"fracao_ref": 0.34, "fracao_lote": 0.5145, "diferenca_pp": 17.45, "ic95_pp": [7.52, 27.37]}}
+variaveis_com_drift_bonferroni: ['entrada.megapixels', 'entrada.razao_aspecto', 'entrada.bytes_por_pixel', 'entrada.media_l', 'entrada.media_r', 'entrada.media_g', 'entrada.media_b', 'entrada.contraste_l', 'entrada.croma_medio', 'entrada.nitidez_laplaciano', 'entrada.frac_estourados', 'entrada.entropia_l', 'saida.confianca_geral', 'saida.confianca_numero_medidor', 'saida.confianca_funcao', 'saida.confianca_leitura', 'saida.precisa_revisao']
+
+$ curl -s "http://localhost:3370/monitor/drift?carga_id=normal-7" (só as listas)
+n_lote 169 | com drift (p<0,05): ['entrada.contraste_l'] | após Bonferroni: [] | PSI: []
+
+$ curl -s -o /dev/null -w '%{http_code}' "http://localhost:3370/monitor/variaveis?inicio=ontem"
+400
+$ curl -s -o /dev/null -w '%{http_code}' "http://localhost:3370/monitor/resumo?faixas=0"
+400
+$ curl -s -o /dev/null -w '%{http_code}' "http://localhost:3370/monitor/variaveis?limite=-1"
+400
+$ curl -s -o /dev/null -w '%{http_code}' "http://localhost:3370/monitor/drift?alfa=2"
+400

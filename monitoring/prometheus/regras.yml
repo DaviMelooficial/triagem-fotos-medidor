@@ -1,0 +1,40 @@
+# Regras gravadas (recording rules): o Prometheus calcula e guarda estas séries a cada 5 s.
+# São as contas que o monitoring/README.md explica; aqui ficam prontas para gráfico e alerta.
+groups:
+  - name: triagem-medidor
+    rules:
+      # Taxa de erro do /extrair na última 5 min: pedidos com código >= 400 / todos.
+      - record: triagem:taxa_erro:5m
+        expr: |
+          sum(rate(bentoml_service_request_total{endpoint="/extrair", http_response_code=~"[45].."}[5m]))
+            /
+          sum(rate(bentoml_service_request_total{endpoint="/extrair"}[5m]))
+
+      # Quantis da latência do /extrair na última 5 min, estimados pelos buckets do histograma.
+      - record: triagem:latencia_p50:5m
+        expr: histogram_quantile(0.50, sum by (le) (rate(bentoml_service_request_duration_seconds_bucket{endpoint="/extrair"}[5m])))
+      - record: triagem:latencia_p95:5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(bentoml_service_request_duration_seconds_bucket{endpoint="/extrair"}[5m])))
+
+      # Fração das respostas 200 que foram para revisão humana (o "custo" operacional da triagem).
+      - record: triagem:fracao_revisao:5m
+        expr: |
+          sum(rate(triagem_predicoes_total{status="ok", precisa_revisao="true"}[5m]))
+            /
+          sum(rate(triagem_predicoes_total{status="ok"}[5m]))
+
+      - alert: TriagemTaxaErroAlta
+        expr: triagem:taxa_erro:5m > 0.2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Mais de 20% dos pedidos ao /extrair deram erro nos últimos 5 min
+
+      - alert: TriagemLatenciaAlta
+        expr: triagem:latencia_p95:5m > 30
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: p95 da latência do /extrair acima de 30 s (sem GPU? fila?)

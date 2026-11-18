@@ -1,0 +1,23 @@
+# Loki recebendo o logs/inferencia.jsonl pelo Promtail (extra a)
+
+$ curl -s localhost:3100/loki/api/v1/labels
+{"status":"success","data":["backend","evento","filename","job","service_name","status"]}
+
+$ curl -s localhost:3100/loki/api/v1/label/status/values
+{"status":"success","data":["erro_cliente","ok"]}
+
+
+$ LogQL: sum by (evento, status) (count_over_time({job="triagem-medidor"}[1h]))
+{'evento': 'pedido'} 561
+{'evento': 'resposta', 'status': 'erro_cliente'} 72
+{'evento': 'resposta', 'status': 'ok'} 528
+
+$ LogQL: {job="triagem-medidor", status="erro_cliente"} | json | line_format "{{.ts}} {{.http_status}} {{.erro_tipo}} {{.erro_msg}}"  (3 últimas)
+2026-11-16T20:17:00.491135-03:00 400 validacao_upload O arquivo enviado não é uma imagem válida. Envie uma foto JPEG ou PNG.
+2026-11-16T20:16:49.735861-03:00 400 InvalidArgument Formato WEBP não aceito. Envie uma foto JPEG ou PNG.
+2026-11-16T20:17:36.740802-03:00 400 InvalidArgument Formato GIF não aceito. Envie uma foto JPEG ou PNG.
+
+$ LogQL: quantile_over_time(0.95, {job="triagem-medidor", evento="resposta", status="ok"} | json latencia_total_s="latencia_total_s" | unwrap latencia_total_s [1h]) by (backend)
+{'backend': 'simulado'} 3.102525
+
+(conferência: linhas no logs/inferencia.jsonl = 1161; soma acima = 561 + 72 + 528 = 1161)

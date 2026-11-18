@@ -15,3 +15,12 @@ __pycache__/
 
 # Pacotes compartilhados em privado (ex.: guias.zip)
 *.zip
+
+# Monitoramento: rastro local das requisições e banco DuckDB das métricas (gerados ao rodar)
+logs/*
+!logs/.gitkeep
+monitoring/*.duckdb
+monitoring/*.duckdb.wal
+
+# Saída padrão dos scripts de análise e planilha (os resultados da entrega ficam em monitoring/analise/)
+monitoring/saida/

@@ -1,0 +1,45 @@
+# Modo real (BACKEND=ollama, qwen3-vl:4b) nesta máquina: Mac Apple Silicon M5, 24 GB, GPU via Metal, Ollama 0.32.7. 2026-11-16.
+# Cada foto de exemplos/ enviada 2 vezes seguidas; tempo medido pelo curl (pedido inteiro).
+# A 1a passada de N=3 rodou com o modelo frio e com a carga simulada usando a CPU ao mesmo tempo.
+
+== N=3
+01_display_registro_103.jpg 200 24.856126s
+02_display_registro_03.jpg 200 19.203258s
+03_tampa_opaca.jpg 200 22.577767s
+04_tampa_suja.jpg 200 24.707121s
+01_display_registro_103.jpg 200 8.696103s
+02_display_registro_03.jpg 200 9.349206s
+03_tampa_opaca.jpg 200 7.595438s
+04_tampa_suja.jpg 200 8.836895s
+== N=1
+01_display_registro_103.jpg 200 3.447416s
+02_display_registro_03.jpg 200 3.053205s
+03_tampa_opaca.jpg 200 2.824885s
+04_tampa_suja.jpg 200 2.958739s
+01_display_registro_103.jpg 200 3.095011s
+02_display_registro_03.jpg 200 2.687235s
+03_tampa_opaca.jpg 200 3.028178s
+04_tampa_suja.jpg 200 2.619079s
+
+# Tempo de cada chamada ao modelo, tirado do log (saida.latencias_chamadas_s) — mesma ordem acima
+N_RESPOSTAS=3
+  ollama qwen3-vl:4b total 24.8497 s; chamadas [18.838, 2.946, 2.933] ; confiança 1.0 ; revisão False
+  ollama qwen3-vl:4b total 19.2021 s; chamadas [12.667, 2.941, 3.501] ; confiança 1.0 ; revisão False
+  ollama qwen3-vl:4b total 22.5801 s; chamadas [17.841, 2.752, 1.87] ; confiança 0.33 ; revisão True
+  ollama qwen3-vl:4b total 24.7053 s; chamadas [18.334, 3.39, 2.88] ; confiança 0.33 ; revisão True
+  ollama qwen3-vl:4b total 8.6973 s; chamadas [2.866, 2.917, 2.824] ; confiança 1.0 ; revisão False
+  ollama qwen3-vl:4b total 9.3554 s; chamadas [2.655, 3.675, 2.943] ; confiança 1.0 ; revisão False
+  ollama qwen3-vl:4b total 7.5937 s; chamadas [2.726, 2.732, 2.019] ; confiança 0.33 ; revisão True
+  ollama qwen3-vl:4b total 8.8436 s; chamadas [2.571, 3.083, 3.063] ; confiança 0.33 ; revisão True
+N_RESPOSTAS=1
+  ollama qwen3-vl:4b total 3.443 s; chamadas [3.293] ; confiança 1.0 ; revisão False
+  ollama qwen3-vl:4b total 3.0515 s; chamadas [2.98] ; confiança 1.0 ; revisão False
+  ollama qwen3-vl:4b total 2.824 s; chamadas [2.717] ; confiança 1.0 ; revisão False
+  ollama qwen3-vl:4b total 2.9563 s; chamadas [2.853] ; confiança 1.0 ; revisão False
+  ollama qwen3-vl:4b total 3.0952 s; chamadas [3.016] ; confiança 1.0 ; revisão False
+  ollama qwen3-vl:4b total 2.6848 s; chamadas [2.605] ; confiança 1.0 ; revisão False
+  ollama qwen3-vl:4b total 3.0269 s; chamadas [2.932] ; confiança 1.0 ; revisão False
+  ollama qwen3-vl:4b total 2.6188 s; chamadas [2.497] ; confiança 1.0 ; revisão False
+
+# Sem GPU (medido em 2026-10-14 no mesmo Mac com num_gpu=0, Ollama só na CPU): UMA chamada levou de 194 s (foto reduzida a 432x768) a 286 s (900x1600).
+# Com N_RESPOSTAS=3 isso passa de 10 min por foto, acima do timeout padrão de 300 s; com N_RESPOSTAS=1 cabe, mas no limite.

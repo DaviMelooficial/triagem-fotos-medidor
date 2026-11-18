@@ -1,0 +1,46 @@
+# DuckDB (extra e): /metrics copiado a cada 5 s durante a carga 'misto' + log na tabela eventos
+$ uv run python monitoring/metrics_to_duckdb.py --url http://localhost:3300 --coletas 30 --intervalo 5
+coleta 1: 32 séries gravadas
+coleta 2: 32 séries gravadas
+...
+coleta 30: 97 séries gravadas
+monitoring/metrics.duckdb: 2779 linhas em metricas, de 30 coletas
+$ uv run python monitoring/metrics_to_duckdb.py --url http://localhost:3300 --coletas 1 --log
+coleta 1: 97 séries gravadas
+eventos do log carregados: 1161
+monitoring/metrics.duckdb: 2876 linhas em metricas, de 31 coletas
+
+$ just duckdb-consultas
+-- 1) Pedidos ao /extrair por código HTTP entre a primeira e a última coleta (contador: última - primeira).
+┌───────────┬─────────┬────────┐
+│ http_code │ pedidos │ fracao │
+│  varchar  │ double  │ double │
+├───────────┼─────────┼────────┤
+│ 200       │    95.0 │   0.95 │
+│ 400       │     5.0 │   0.05 │
+│ 500       │     0.0 │    0.0 │
+└───────────┴─────────┴────────┘
+
+-- 2) Pedidos por intervalo de coleta (5 s): diferença entre coletas seguidas, como o increase() do Prometheus.
+┌───────────────────────────────┬──────────────────────┐
+│          coletado_em          │ pedidos_no_intervalo │
+│   timestamp with time zone    │        double        │
+├───────────────────────────────┼──────────────────────┤
+│ 2026-11-16 20:16:07.927916-03 │                 NULL │
+│ 2026-11-16 20:16:12.965996-03 │                  0.0 │
+│ 2026-11-16 20:16:18.01673-03  │                  2.0 │
+│ 2026-11-16 20:16:23.092508-03 │                  4.0 │
+│ 2026-11-16 20:16:28.17188-03  │                  4.0 │
+│ 2026-11-16 20:16:33.242755-03 │                  5.0 │
+│ 2026-11-16 20:16:38.319235-03 │                  4.0 │
+│ 2026-11-16 20:16:43.388176-03 │                  4.0 │
+└───────────────────────────────┴──────────────────────┘
+
+-- 3) Direto do log (tabela eventos): latência e revisão por backend, só respostas 200.
+┌──────────┬───────┬───────────────┬───────────┬────────────────┐
+│ backend  │   n   │ lat_mediana_s │ lat_p95_s │ fracao_revisao │
+│ varchar  │ int64 │    double     │  double   │     double     │
+├──────────┼───────┼───────────────┼───────────┼────────────────┤
+│ simulado │   528 │         2.364 │     3.103 │          0.366 │
+└──────────┴───────┴───────────────┴───────────┴────────────────┘
+

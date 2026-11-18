@@ -1,0 +1,113 @@
+# HELP triagem_entrada_luminancia_media Luminância média (0-255) das fotos recebidas: sinal de drift de entrada no Prometheus
+# TYPE triagem_entrada_luminancia_media histogram
+triagem_entrada_luminancia_media_sum 13669.752000000002
+triagem_entrada_luminancia_media_bucket{le="32.0"} 0.0
+triagem_entrada_luminancia_media_bucket{le="64.0"} 5.0
+triagem_entrada_luminancia_media_bucket{le="96.0"} 5.0
+triagem_entrada_luminancia_media_bucket{le="128.0"} 15.0
+triagem_entrada_luminancia_media_bucket{le="160.0"} 92.0
+triagem_entrada_luminancia_media_bucket{le="192.0"} 94.0
+triagem_entrada_luminancia_media_bucket{le="224.0"} 95.0
+triagem_entrada_luminancia_media_bucket{le="255.0"} 98.0
+triagem_entrada_luminancia_media_bucket{le="+Inf"} 98.0
+triagem_entrada_luminancia_media_count 98.0
+# HELP bentoml_service_request_duration_seconds runner RPC duration in seconds
+# TYPE bentoml_service_request_duration_seconds histogram
+bentoml_service_request_duration_seconds_sum{endpoint="/readyz",http_response_code="200",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 0.004989624954760075
+bentoml_service_request_duration_seconds_bucket{endpoint="/readyz",http_response_code="200",le="0.05",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/readyz",http_response_code="200",le="0.1",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/readyz",http_response_code="200",le="0.25",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/readyz",http_response_code="200",le="0.5",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/readyz",http_response_code="200",le="1.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/readyz",http_response_code="200",le="2.5",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/readyz",http_response_code="200",le="5.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/readyz",http_response_code="200",le="10.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/readyz",http_response_code="200",le="30.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/readyz",http_response_code="200",le="60.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/readyz",http_response_code="200",le="120.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/readyz",http_response_code="200",le="180.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/readyz",http_response_code="200",le="300.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/readyz",http_response_code="200",le="600.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/readyz",http_response_code="200",le="+Inf",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.0
+bentoml_service_request_duration_seconds_count{endpoint="/readyz",http_response_code="200",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.0
+bentoml_service_request_duration_seconds_sum{endpoint="/extrair",http_response_code="200",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 220.02868133410811
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="200",le="0.05",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 0.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="200",le="0.1",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 0.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="200",le="0.25",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 0.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="200",le="0.5",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 0.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="200",le="1.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="200",le="2.5",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 65.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="200",le="5.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 95.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="200",le="10.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 95.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="200",le="30.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 95.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="200",le="60.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 95.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="200",le="120.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 95.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="200",le="180.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 95.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="200",le="300.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 95.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="200",le="600.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 95.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="200",le="+Inf",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 95.0
+bentoml_service_request_duration_seconds_count{endpoint="/extrair",http_response_code="200",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 95.0
+bentoml_service_request_duration_seconds_sum{endpoint="/extrair",http_response_code="400",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 3.511836083023809
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="400",le="0.05",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 2.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="400",le="0.1",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 2.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="400",le="0.25",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 2.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="400",le="0.5",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 2.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="400",le="1.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 3.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="400",le="2.5",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 5.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="400",le="5.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 5.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="400",le="10.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 5.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="400",le="30.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 5.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="400",le="60.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 5.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="400",le="120.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 5.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="400",le="180.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 5.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="400",le="300.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 5.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="400",le="600.0",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 5.0
+bentoml_service_request_duration_seconds_bucket{endpoint="/extrair",http_response_code="400",le="+Inf",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 5.0
+bentoml_service_request_duration_seconds_count{endpoint="/extrair",http_response_code="400",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 5.0
+# HELP triagem_confianca_geral Confiança geral (fração de votos do campo mais duvidoso) das respostas 200
+# TYPE triagem_confianca_geral histogram
+triagem_confianca_geral_sum{backend="simulado"} 81.69000000000001
+triagem_confianca_geral_bucket{backend="simulado",le="0.2"} 0.0
+triagem_confianca_geral_bucket{backend="simulado",le="0.34"} 11.0
+triagem_confianca_geral_bucket{backend="simulado",le="0.5"} 11.0
+triagem_confianca_geral_bucket{backend="simulado",le="0.67"} 29.0
+triagem_confianca_geral_bucket{backend="simulado",le="0.8"} 29.0
+triagem_confianca_geral_bucket{backend="simulado",le="0.99"} 29.0
+triagem_confianca_geral_bucket{backend="simulado",le="1.0"} 95.0
+triagem_confianca_geral_bucket{backend="simulado",le="+Inf"} 95.0
+triagem_confianca_geral_count{backend="simulado"} 95.0
+# HELP triagem_latencia_chamada_modelo_segundos Duração de CADA chamada ao modelo (o /extrair faz N_RESPOSTAS chamadas)
+# TYPE triagem_latencia_chamada_modelo_segundos histogram
+triagem_latencia_chamada_modelo_segundos_sum{backend="simulado"} 106.16400000000002
+triagem_latencia_chamada_modelo_segundos_bucket{backend="simulado",le="0.1"} 0.0
+triagem_latencia_chamada_modelo_segundos_bucket{backend="simulado",le="0.25"} 52.0
+triagem_latencia_chamada_modelo_segundos_bucket{backend="simulado",le="0.5"} 240.0
+triagem_latencia_chamada_modelo_segundos_bucket{backend="simulado",le="1.0"} 285.0
+triagem_latencia_chamada_modelo_segundos_bucket{backend="simulado",le="2.5"} 285.0
+triagem_latencia_chamada_modelo_segundos_bucket{backend="simulado",le="5.0"} 285.0
+triagem_latencia_chamada_modelo_segundos_bucket{backend="simulado",le="10.0"} 285.0
+triagem_latencia_chamada_modelo_segundos_bucket{backend="simulado",le="30.0"} 285.0
+triagem_latencia_chamada_modelo_segundos_bucket{backend="simulado",le="60.0"} 285.0
+triagem_latencia_chamada_modelo_segundos_bucket{backend="simulado",le="120.0"} 285.0
+triagem_latencia_chamada_modelo_segundos_bucket{backend="simulado",le="300.0"} 285.0
+triagem_latencia_chamada_modelo_segundos_bucket{backend="simulado",le="600.0"} 285.0
+triagem_latencia_chamada_modelo_segundos_bucket{backend="simulado",le="+Inf"} 285.0
+triagem_latencia_chamada_modelo_segundos_count{backend="simulado"} 285.0
+# HELP bentoml_service_request_total Total number of runner RPC
+# TYPE bentoml_service_request_total counter
+bentoml_service_request_total{endpoint="/extrair",http_response_code="200",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 95.0
+bentoml_service_request_total{endpoint="/extrair",http_response_code="500",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 0.0
+bentoml_service_request_total{endpoint="/readyz",http_response_code="200",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.0
+bentoml_service_request_total{endpoint="/extrair",http_response_code="400",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 5.0
+# HELP triagem_predicoes_total Pedidos ao /extrair por backend, resultado (ok/erro_cliente/erro_servidor) e precisa_revisao
+# TYPE triagem_predicoes_total counter
+triagem_predicoes_total{backend="simulado",precisa_revisao="true",status="ok"} 29.0
+triagem_predicoes_total{backend="simulado",precisa_revisao="sem_resultado",status="erro_cliente"} 5.0
+triagem_predicoes_total{backend="simulado",precisa_revisao="false",status="ok"} 66.0
+# HELP bentoml_service_request_in_progress Total number of runner RPC in progress now
+# TYPE bentoml_service_request_in_progress gauge
+bentoml_service_request_in_progress{endpoint="/readyz",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 0.0
+bentoml_service_request_in_progress{endpoint="/extrair",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 0.0
+# HELP bentoml_service_last_request_timestamp_seconds Timestamp of the last received request
+# TYPE bentoml_service_last_request_timestamp_seconds gauge
+bentoml_service_last_request_timestamp_seconds{pid="67128",runner_name="TriagemMedidor",service_name="TriagemMedidor",service_version="not available"} 1.794871086776448e+09

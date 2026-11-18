@@ -1,0 +1,27 @@
+# Entradas inválidas que davam 500 (ou derrubavam a memória) e hoje têm resposta própria (serviço simulado na porta 3370, 2026-11-16T21:22:55-03:00)
+$ curl -s -X POST localhost:3370/extrair -H 'content-type: application/json' -d '{"foto":"x"}'
+[{"error":"O arquivo enviado não é uma imagem válida. Envie uma foto JPEG ou PNG."}]  -> HTTP 400
+$ curl -s -X POST localhost:3370/extrair -F arquivo=@exemplos/01_display_registro_103.jpg      # campo com outro nome
+[{"error":"Envie a foto como arquivo no campo multipart \"foto\" (ex.: curl -F \"foto=@foto.jpg\")."}]  -> HTTP 400
+$ curl -s -X POST localhost:3370/extrair -F 'foto=http://example.com/a.jpg'   # foto em texto
+[{"error":"Envie a foto como arquivo no campo multipart \"foto\" (ex.: curl -F \"foto=@foto.jpg\")."}]  -> HTTP 400
+$ curl -s -X POST localhost:3370/extrair -d 'foto=abc'   # urlencoded
+[{"error":"Envie a foto como arquivo no campo multipart \"foto\" (ex.: curl -F \"foto=@foto.jpg\")."}]  -> HTTP 400
+$ curl -s -X POST localhost:3370/extrair -F foto=@grande.bin   # 21 MB, acima de MAX_UPLOAD_MB=20
+[{"error":"Arquivo maior que 20 MB (MAX_UPLOAD_MB). Envie uma foto menor."}]  -> HTTP 413
+$ curl -s -X POST localhost:3370/extrair -H 'Transfer-Encoding: chunked' -F foto=@exemplos/01_display_registro_103.jpg   # sem Content-Length
+  -> HTTP 200
+$ (socket) POST com Content-Length 100000, manda 1000 bytes e fecha a conexão
+
+# As 7 linhas 'resposta' correspondentes no log (http_status, erro_tipo, corpo_bytes, erro_msg):
+400 validacao_upload 12 O arquivo enviado não é uma imagem válida. Envie uma foto JPEG ou PNG.
+400 campo_foto_ausente 129575 Envie a foto como arquivo no campo multipart "foto" (ex.: curl -F "foto=@foto.jp
+400 campo_foto_ausente 175 Envie a foto como arquivo no campo multipart "foto" (ex.: curl -F "foto=@foto.jp
+400 content_type_nao_aceito 8 Envie a foto como arquivo no campo multipart "foto" (ex.: curl -F "foto=@foto.jp
+413 upload_grande 21000214 Arquivo maior que 20 MB (MAX_UPLOAD_MB). Envie uma foto menor.
+200 None 129572 
+499 cliente_desconectou 1000 cliente desconectou
+
+# No terminal do serviço, um 400 vira uma linha (sem traceback e sem os bytes enviados); 'Traceback' no terminal desde que subiu:
+0
+2026-11-16T21:22:55-0300 [INFO] [entry_service:TriagemMedidor:1] Exception on /extrair [POST] (erro do cliente, 400): O arquivo enviado não é uma imagem válida. Envie uma foto JPEG ou PNG. (trace=6648b056c38b87fb82d08d69235f1a0a,s

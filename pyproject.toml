@@ -6,8 +6,11 @@ readme = "README.md"
 requires-python = "==3.12.*"
 dependencies = [
     "bentoml==1.4.39",
+    "numpy==2.5.3",
     "ollama==0.6.3",
     "pillow==11.3.0",
+    "prometheus-client==0.26.0",
+    "scipy==1.18.1",
 ]
 
 [dependency-groups]
@@ -15,7 +18,16 @@ dev = [
     "httpx==0.28.1",
     "pytest==8.4.2",
 ]
+monitoramento = [
+    "duckdb==2.0.0",
+    "matplotlib==3.11.2",
+    "openpyxl==3.1.5",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]  # deixa os testes importarem extrator.py e service.py da raiz
+
+[tool.uv]
+# "uv sync" já instala também o grupo de monitoramento (análise, planilha, DuckDB).
+default-groups = ["dev", "monitoramento"]

@@ -1,0 +1,35 @@
+$ uv run python quantis.py 2026-11-16T20:16:07-03:00 2026-11-16T20:18:09-03:00   (script abaixo, rodado sobre logs/inferencia.jsonl desta máquina)
+# Quantis REAIS da latência (latencia_total_s do log) na janela da carga 'misto' das fotos do /metrics
+# janela: 2026-11-16T20:16:07-03:00 a 2026-11-16T20:18:09-03:00 (eventos 'resposta' com ts dentro dela); backend: ['simulado']
+# n = 100 pedidos, por código HTTP: {200: 95, 400: 5}
+# quantis por interpolação linear entre amostras ordenadas (numpy.quantile, método 'linear')
+mínimo   0.0048 s
+Q1       2.0827 s
+mediana  2.3035 s
+Q3       2.5568 s
+p95      2.9866 s
+máximo   3.3259 s
+média    2.2353 s;  soma 223.5299 s
+# Comparar com a planilha (estimado pelos buckets do /metrics): Q1 1,477; mediana 2,045; Q3 2,917; p95 4,583 s; soma (_sum) 223,54 s.
+# Soma do log e _sum do /metrics praticamente iguais: as duas medidas cobrem o mesmo pedido, medidas em pontos vizinhos do servidor.
+
+# script usado:
+import json, sys
+from datetime import datetime
+import numpy as np
+t3, t4 = sys.argv[1], sys.argv[2]
+a, b = datetime.fromisoformat(t3).timestamp(), datetime.fromisoformat(t4).timestamp()
+ev = [json.loads(l) for l in open("logs/inferencia.jsonl")]
+r = [e for e in ev if e["evento"] == "resposta" and a <= e["ts_epoch"] <= b]
+lat = np.array([e["latencia_total_s"] for e in r])
+st = {}
+for e in r: st[e["http_status"]] = st.get(e["http_status"], 0) + 1
+print(f"# Quantis REAIS da latência (latencia_total_s do log) na janela da carga 'misto' das fotos do /metrics")
+print(f"# janela: {t3} a {t4} (eventos 'resposta' com ts dentro dela); backend: {sorted({e['backend'] for e in r})}")
+print(f"# n = {len(r)} pedidos, por código HTTP: {st}")
+print("# quantis por interpolação linear entre amostras ordenadas (numpy.quantile, método 'linear')")
+for nome, q in [("mínimo", 0), ("Q1", .25), ("mediana", .5), ("Q3", .75), ("p95", .95), ("máximo", 1)]:
+    print(f"{nome:8s} {np.quantile(lat, q):.4f} s")
+print(f"média    {lat.mean():.4f} s;  soma {lat.sum():.4f} s")
+print("# Comparar com a planilha (estimado pelos buckets do /metrics): Q1 1,477; mediana 2,045; Q3 2,917; p95 4,583 s; soma (_sum) 223,54 s.")
+print("# Soma do log e _sum do /metrics praticamente iguais: as duas medidas cobrem o mesmo pedido, medidas em pontos vizinhos do servidor.")
